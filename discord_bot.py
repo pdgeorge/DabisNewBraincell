@@ -192,7 +192,7 @@ async def once_done(sink: discord.sinks, channel: discord.TextChannel, *args):  
             f.write(file.fp.read())
             saved_files.append(file.filename)
         # await save_files(files)
-    returned_transcription = tbone_transcriber.transcriber(saved_files)
+    returned_transcription = "tbone_transcriber.transcriber(saved_files)"
     # print(f"d_b.py: pre loop: {returned_transcription}")
     for transcription in returned_transcription:
         print(f"d_b.py: for t in r_t: {transcription=}")
