@@ -140,11 +140,6 @@ async def send_msg(websocket, path, dabi, twitch_queue):
         global_discord_queue.put(voice_path)
         await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
         print("Done speaking")
-        if os.path.exists(voice_path):
-            os.remove(voice_path)
-            print(f"{voice_path} removed")
-        else:
-            print(f"Unable to remove {voice_path}")
 
 def load_new_personality(dabi, personality_to_load):
     print("Load_new_personality")
