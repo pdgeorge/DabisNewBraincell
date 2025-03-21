@@ -4,8 +4,10 @@ import os
 import json
 # from discord.ext import commands
 from dotenv import load_dotenv
-import tbone_transcriber
+# import tbone_transcriber
 import asyncio
+
+from pydub import AudioSegment
 
 load_dotenv()
 
@@ -83,8 +85,15 @@ async def listen(ctx: discord.ApplicationContext):
                 to_play = global_discord_queue.get()
                 vc.stop()
                 vc.play(discord.FFmpegPCMAudio(to_play))
-                print(f"Playing {to_play}")
-            await asyncio.sleep(0.1)
+                to_delay = audio_length(to_play)
+                print(f"Playing {to_play}, it is {to_delay} long")
+                await asyncio.sleep(to_delay + 2)
+                if os.path.exists(to_play):
+                    os.remove(to_play)
+                    print(f"{to_play} removed")
+                else:
+                    print(f"Unable to remove {to_play}")
+                    await asyncio.sleep(0.1)
     except Exception as e:
         print(f"Somebody tell George Dabi's braincell asploded: {e}")
 
@@ -202,6 +211,12 @@ async def once_done(sink: discord.sinks, channel: discord.TextChannel, *args):  
     # Additionally, need to update this as a whole for when multiple people are talking or able to talk.
     # Potential option: Combine to one single message?
     await channel.send(f"Transcription for this message:\n\n{transcription["msg_msg"]}")  # Send a message with the transcription.
+
+def audio_length(file):
+    audio = AudioSegment.from_file(file)
+    duration_seconds = len(audio) / 1000
+
+    return duration_seconds
 
 def start_bot(twitch_queue, discord_queue):
     global global_twitch_queue
