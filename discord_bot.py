@@ -88,6 +88,7 @@ async def listen(interaction: discord.Interaction):
                 else:
                     print(f"Unable to remove {to_play}")
                 await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
     except Exception as e:
         print(f"Somebody tell George Dabi's braincell asploded: {e}")
 
