@@ -29,7 +29,7 @@ TIME_BETWEEN_SPEAKS = 10
 
 CABLE_A_OUTPUT = 26 # This was found using dabi.scan_audio_devices()
 
-global_discord_queue = None
+global_speaking_queue = None
 
 async def db_insert(table_name, username, message, response):
     # Connect to the db. If it doesn't exist it will be created.
@@ -137,7 +137,7 @@ async def send_msg(websocket, path, dabi, twitch_queue):
         await websocket.send(to_send)
         
         # dabi.read_message_choose_device_mp3(voice_path, CABLE_A_OUTPUT)
-        global_discord_queue.put(voice_path)
+        global_speaking_queue.put(voice_path)
         await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
         print("Done speaking")
 
@@ -190,9 +190,9 @@ async def main(twitch_queue):
         print("An exception occured:", e)
         traceback.print_exc()
           
-def pre_main(twitch_queue, discord_queue):
-    global global_discord_queue
-    global_discord_queue = discord_queue
+def pre_main(twitch_queue, speaking_queue):
+    global global_speaking_queue
+    global_speaking_queue = speaking_queue
     asyncio.run(main(twitch_queue))
 
 if __name__ == "__main__":
