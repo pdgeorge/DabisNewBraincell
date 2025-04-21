@@ -22,7 +22,7 @@ connections = {}
 time_to_listen = 10
 
 global_twitch_queue = None
-global_discord_queue = None
+global_speaking_queue = None
 global_comminicating = False
 
 @bot.event
@@ -52,7 +52,7 @@ async def ping(interaction: discord.Interaction):
         description="Queue Length!!"
 )
 async def queue_length(interaction: discord.Interaction):
-    await interaction.response.send_message(f"There are {global_discord_queue.qsize()} items in the discord queue.")
+    await interaction.response.send_message(f"There are {global_speaking_queue.qsize()} items in the discord queue.")
 
 @tree.command(
         name="listen",
@@ -72,11 +72,11 @@ async def listen(interaction: discord.Interaction):
         while True:
             if vc.is_playing():
                 await asyncio.sleep(1)
-            if global_discord_queue.qsize() > 0:
+            if global_speaking_queue.qsize() > 0:
                 print("==========vc.is_connected=========")
                 print(f"{vc.is_connected()=}")
                 print("==========vc.is_connected=========")
-                to_play = global_discord_queue.get()
+                to_play = global_speaking_queue.get()
                 vc.stop()
                 vc.play(discord.FFmpegPCMAudio(to_play))
                 to_delay = audio_length(to_play)
@@ -231,19 +231,19 @@ def audio_length(file):
 
     return duration_seconds
 
-def start_bot(twitch_queue, discord_queue):
+def start_bot(twitch_queue, speaking_queue):
     global global_twitch_queue
-    global global_discord_queue
+    global global_speaking_queue
     global_twitch_queue = twitch_queue
-    global_discord_queue = discord_queue
+    global_speaking_queue = speaking_queue
     bot.run(DISCORD_TOKEN)
 
 if __name__ == "__main__":
     # To run the bot quickly
     import multiprocessing
     twitch_queue = multiprocessing.Queue()
-    discord_queue = multiprocessing.Queue()
-    start_bot(twitch_queue, discord_queue)
+    speaking_queue = multiprocessing.Queue()
+    start_bot(twitch_queue, speaking_queue)
 
     # For whatever we want to test.
     # asyncio.run(test())

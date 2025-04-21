@@ -24,18 +24,18 @@ async def main():
     try:
         ### QUEUES ###
         twitch_queue = multiprocessing.Queue() # Messages to process for TTT before passing to TTS
-        discord_queue = multiprocessing.Queue() # Messages to TTS
+        speaking_queue = multiprocessing.Queue() # Messages to TTS
 
         ### INGESTORS ###
         listen_to_chat = False # Change whether you want Dabi to listen to chat messages or not
         event_process = multiprocessing.Process(target=twitch_event.start_events, args=(twitch_queue, listen_to_chat,))
         event_process.start()
 
-        discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(twitch_queue,discord_queue,))
+        discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(twitch_queue,speaking_queue,))
         discord_process.start()
         
         ### MAIN APP ###
-        app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue,discord_queue,))
+        app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue,speaking_queue,))
         app_process.start()
 
     except KeyboardInterrupt as kb_interrupt:
