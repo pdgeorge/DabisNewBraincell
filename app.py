@@ -115,7 +115,7 @@ def check_for_command(message, dabi):
     if msg == "𝓻𝓮𝓼𝓮𝓽":
         dabi.reset_memory()
         message["formatted_msg"] = "twitch:Memory has been reset."
-    if msg.find("!𝓬𝓱𝓪𝓷𝓰𝓮") > -1:
+    if msg.find("𝓬𝓱𝓪𝓷𝓰𝓮") > -1:
         msg_arr_two = msg.split()
         print(msg_arr_two[1])
         load_new_personality(dabi, msg_arr_two[1])

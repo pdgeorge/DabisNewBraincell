@@ -73,11 +73,29 @@ async def extract_message_to_sub(event):
 
 async def handle_redemptions(event):
     global global_twitch_queue
-    if event.get('payload', {}).get('event', {}).get('reward', {}).get('title', {}) == "Ask Dabi A Q":
+    event_title = event.get('payload', {}).get('event', {}).get('reward', {}).get('title', {})
+    match event_title:
+        case "Ask Dabi A Q":
+            to_send = await extract_message_to_send_points(event)
+            print(f"handle_redemptions {to_send=}")
+            global_twitch_queue.put(json.dumps(to_send))
+        case "timeout":
+            print("timeout entered")
+            formatted_received = await extract_message_to_send_points(event)
+            print(f"{formatted_received=}")
+            response = await timeout_user(formatted_received)
 
-        to_send = await extract_message_to_send_points(event)
-        print(f"handle_redemptions {to_send=}")
-        global_twitch_queue.put(json.dumps(to_send))
+async def timeout_user(msg):
+    formatted_return = None
+    input_str = msg.get('msg_msg', {})
+    online_chatters = tw.get_users_formatted()
+
+    matched_name = next(
+        (name for name in online_chatters if name.lower() in input_str.lower()),
+        None
+    )
+    
+    return formatted_return
 
 async def extract_message_to_send_points(event):
     formatted_msg = None
@@ -94,7 +112,7 @@ async def extract_message_to_send_points(event):
                 "msg_msg": msg_msg,
                 "formatted_msg": formatted_msg
             }
-    
+
     return formatted_return
 
 async def on_message(ws, message):

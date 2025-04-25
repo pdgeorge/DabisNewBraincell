@@ -22,6 +22,8 @@ import pyaudio
 from pydub import AudioSegment
 from pydub.playback import _play_with_simpleaudio
 from dotenv import load_dotenv
+import twitch_wrappers as tw
+import random
 
 load_dotenv()
 
@@ -38,6 +40,11 @@ APIKEY = os.getenv("DEEPSEEK_API_KEY") # For DEEPSEEK
 USER_ID = os.getenv("PLAY_HT_USER_ID")
 API_KEY = os.getenv("PLAY_HT_API_KEY")
 TIKTOK_TOKEN = os.getenv("TIKTOK_TOKEN")
+ACCESS_TOKEN = None
+
+CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')
+CLIENT_ID = os.getenv('DABI_CLIENT_ID')
+
 
 client = AsyncOpenAI(
     base_url=BASE_URL,
@@ -86,8 +93,87 @@ def speech_listener(listen_for):
         transcription = "Error"
     return transcription
 
+########################################################################
+####################### ALL OF THE TOOLS GO HERE #######################
+########################################################################
+
+def load_tools():
+    with open('dabi_programs.json', 'r') as f:
+        data = json.load(f)
+    if data:
+        return data.get('programs')
+
+def full_timeout_user(user_name: str, length: int):
+    print("\nfull_timeout_user ######################################################################## full_timeout_user\n")
+    if length == 0 or length > 100 or length < 0:
+        length = 10
+    user_id = tw.get_user_id(user_name)
+    url = f'https://api.twitch.tv/helix/moderation/bans?broadcaster_id={CHANNEL_ID}&moderator_id={CHANNEL_ID}'
+
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Client-Id': CLIENT_ID,
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "data":
+        {
+            "user_id": user_id,
+            "duration": length,
+            "reason": "Dabi"
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+    return response.json()
+
+def timeout_user(callers_name, user_name, length):
+    print("\ntimeout_user ######################################################################## timeout_user\n")
+    print(f"{callers_name=} and {user_name=} and {length=}")
+    russian_roulette = random.randint(0,99)
+    print(russian_roulette)
+    moderators = tw.get_moderators_formatted()
+
+    exists = user_name.lower() in moderators
+
+    if russian_roulette < 25 or exists:
+        user_name = callers_name
+
+    # Make this a condom?
+    if type(length) is int:
+        response = full_timeout_user(user_name, length)
+    else:
+        try:
+            length = int(length)
+            response = full_timeout_user(user_name, length)
+        except Exception as e:
+            print(repr(e))
+
+    return response
+
+def get_current_weather(location: str, unit: str = "celsius"):
+    print("########################################################################")
+    print("get_current_weather")
+    response = f"Failed to get the weather for {location}"
+
+    try:
+        response = requests.get(f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=en&format=json")
+        geocoding = response.json().get('results')[0]
+        response = requests.get(f"https://api.open-meteo.com/v1/forecast?latitude={geocoding.get('latitude')}&longitude={geocoding.get('longitude')}&current=temperature_2m&temperature_unit={unit}")
+    except Exception as e:
+        print(repr(e))
+
+    print(f"{response=}")
+    return response.json()
+
+########################################################################
+################## EVERYTHING ABOUT THE CLASS IS HERE ##################
+########################################################################
+
 class OpenAI_Bot():
     def __init__(self, bot_name, system_message, voice=None):
+        global ACCESS_TOKEN
         self.chat_history = []
         self.bot_name = bot_name
         self.voice = voice
@@ -100,6 +186,8 @@ class OpenAI_Bot():
         path = normalise_dir(TEXT_DIR)
         temp_bot_file = f"{self.bot_name}.txt"
         self.bot_file = os.path.join(path,temp_bot_file)
+        self.tools = load_tools()
+        print(self.tools)
 
         self.last_pulled = "youtube" # Useful only if doing GamingAssistant project
         self.mode = "colab" # Useful only if doing GamingAssistant project
@@ -111,6 +199,8 @@ class OpenAI_Bot():
 
         self.chat_history.append(temp_system_message)
         self.total_tokens = 0
+
+        ACCESS_TOKEN = tw.update_key()
 
         # "I am alive!"
         print("Bot initialised, name: " + self.bot_name)
@@ -134,6 +224,7 @@ class OpenAI_Bot():
         to_send['role'] = 'user'
         to_send['content'] = data_to_give
         self.chat_message = to_send
+        tool_calls = None
 
         print("chat message is: ")
         print(to_send)
@@ -144,12 +235,58 @@ class OpenAI_Bot():
                 model="deepseek-chat",
                 messages=self.chat_history,
                 temperature=0.6,
+                max_tokens=300,
+                tools=self.tools,
+                tool_choice="auto"
             )
+
+            response_message = response.choices[0].message
+            tool_calls = response_message.tool_calls
+
+            if tool_calls:
+                self.chat_history.append({
+                    "role": "assistant",
+                    "content": response_message.content,
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments
+                            },
+                            "type": "function"
+                        }
+                        for tc in tool_calls
+                    ]
+                })
+
+                for tool_call in tool_calls:
+                    args = json.loads(tool_call.function.arguments)
+
+                    result = globals()[tool_call.function.name](**args)
+
+                    self.chat_history.append({
+                        "role": "tool",
+                        "content": json.dumps(result),
+                        "tool_call_id": tool_call.id
+                    })
+                    print(f"{self.chat_history}")
+                final_response = await client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=self.chat_history
+                )
+                response = final_response
+            else:
+                response = response
+
         except Exception as e:
+            print("297 ########################################################################")
+            print(f"{self.chat_history=}")
             print("An exception occurred:", str(e))
             response = ERROR_MSG
             response["choices"][0]["message"] = {'role': 'assistant', 'content': 'Sorry, there was an exception. '+str(e)}
-        
+            self.reset_memory()
+
         bot_response = {}
         print(response)
         bot_response["role"] = response.choices[0].message.role

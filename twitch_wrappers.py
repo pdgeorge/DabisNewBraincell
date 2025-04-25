@@ -13,6 +13,48 @@ ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN')
 CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')
 USER_ID = os.getenv('BOT_USER_ID')
 
+def get_users_formatted():
+    response = get_users()
+    response.get('data', {})
+
+    user_names = [user['user_name'] for user in response['data']]
+
+    return user_names
+
+def get_users():
+    url = f'https://api.twitch.tv/helix/chat/chatters?broadcaster_id={CHANNEL_ID}&moderator_id={CHANNEL_ID}'
+
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Client-Id': CLIENT_ID,
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.get(url, headers=headers)
+
+    return response.json()
+
+def get_moderators_formatted():
+    response = get_moderators()
+    response.get('data',{})
+
+    user_names = [user['user_name'].lower() for user in response['data']]
+
+    return user_names
+
+def get_moderators():
+    url = f'https://api.twitch.tv/helix/moderation/moderators?broadcaster_id={CHANNEL_ID}'
+
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Client-Id': CLIENT_ID,
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.get(url, headers=headers)
+
+    return response.json()
+
 def validate():
     load_dotenv(override=True)
     ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN')
@@ -38,6 +80,20 @@ def get_user(user):
     response = requests.get(url, headers=headers)
     
     return response.json()
+    
+def get_user_id(user):
+    url = f'https://api.twitch.tv/helix/users?login={user}'
+
+    headers = {
+        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Client-Id': CLIENT_ID,
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.get(url, headers=headers)
+    data = response.json()
+
+    return data.get('data', {})[0].get('id', {})
     
 def timeout_user(user_name):
     response = get_user(user_name)
@@ -134,7 +190,20 @@ def update_key():
 if __name__ == "__main__":
     new_key = update_key() # For updating the key
     response = validate()
-    response = timeout_user("t_b0n3")
+    print("Moderators!")
+    response = get_moderators()
     print(response)
-    response = get_user("pdgeorge")
+    print("End Moderators")
+    print("Moderators!")
+    response = get_moderators_formatted()
+    print(response)
+    print("End Moderators")
+    # response = timeout_user("t_b0n3")
+    print()
+    print("Chatters!")
+    chat_response = get_users()
+    print(chat_response)
+    print("Formatted! Chatters!")
+    response_two = get_users_formatted()
+    print(response_two)
     response = send_msg("Hello, world!")
