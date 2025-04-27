@@ -95,10 +95,11 @@ def get_user_id(user):
 
     return data.get('data', {})[0].get('id', {})
     
-def timeout_user(user_name):
-    response = get_user(user_name)
+def timeout_user(user_name: str, length: int):
+    user_id = get_user_id(user_name)
+    print(f"Get user_id = {user_id=}")
 
-    user_id = response.get('data', {})[0].get('id', {})
+    # user_id = response.get('data', {})[0].get('id', {})
 
     url = f'https://api.twitch.tv/helix/moderation/bans?broadcaster_id={CHANNEL_ID}&moderator_id={CHANNEL_ID}'
 
@@ -112,13 +113,38 @@ def timeout_user(user_name):
         "data":
         {
             "user_id": user_id,
-            "duration": 1,
+            "duration": length,
             "reason": "test"
         }
     }
 
     response = requests.post(url, headers=headers, json=data)
     return response.json()
+
+# def full_timeout_user(user_name: str, length: int):
+#     print("\nfull_timeout_user ######################################################################## full_timeout_user\n")
+#     if length == 0 or length > 100 or length < 0:
+#         length = 10
+#     user_id = tw.get_user_id(user_name)
+#     url = f'https://api.twitch.tv/helix/moderation/bans?broadcaster_id={CHANNEL_ID}&moderator_id={CHANNEL_ID}'
+
+#     headers = {
+#         'Authorization': f'Bearer {ACCESS_TOKEN}',
+#         'Client-Id': CLIENT_ID,
+#         'Content-Type': 'application/json'
+#     }
+
+#     data = {
+#         "data":
+#         {
+#             "user_id": user_id,
+#             "duration": length,
+#             "reason": "Dabi"
+#         }
+#     }
+
+#     response = requests.post(url, headers=headers, json=data)
+#     return response.json()
 
 def send_msg(msg_to_send):
     url = f'https://api.twitch.tv/helix/chat/messages'
@@ -207,3 +233,7 @@ if __name__ == "__main__":
     response_two = get_users_formatted()
     print(response_two)
     response = send_msg("Hello, world!")
+else:
+    # We want this to run when always
+    new_key = update_key() # For updating the key
+    response = validate()
