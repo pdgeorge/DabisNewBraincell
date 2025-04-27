@@ -1,0 +1,58 @@
+{
+    "programs": [
+        {
+            "type": "function",
+            "function": {
+                "name": "timeout_user",
+                "description": "Timeout a user for a period of time",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "callers_name": {
+                            "type": "string",
+                            "description": "Twitch user name who called the function"
+                        },
+                        "user_name": {
+                            "type": "string",
+                            "description": "Twitch user name"
+                        },
+                        "length": {
+                            "type": "number",
+                            "description": "Length of time in seconds"
+                        }
+                    },
+                    "required": [
+                        "user_name",
+                        "length"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_current_weather",
+                "description": "Get current weather information",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "City name"
+                        },
+                        "unit": {
+                            "type": "string",
+                            "enum": [
+                                "celsius",
+                                "fahrenheit"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "location"
+                    ]
+                }
+            }
+        }
+    ]
+}

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+#
 import asyncio
 import multiprocessing
 import time
@@ -40,16 +42,19 @@ async def main():
 
     except KeyboardInterrupt as kb_interrupt:
         print(f"[!] Keyboard interrupt.\n{kb_interrupt}")
-        event_process.join()
+        event_process.join(5)
         event_process.terminate()
+        event_process.kill()
         event_process.close()
         
-        discord_process.join()
+        discord_process.join(5)
         discord_process.terminate()
+        discord_process.kill()
         discord_process.close()
         
-        app_process.join()
+        app_process.join(5)
         app_process.terminate()
+        app_process.kill()
         app_process.close()
     
 if __name__ == "__main__":
