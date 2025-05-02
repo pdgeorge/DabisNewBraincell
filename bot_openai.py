@@ -103,30 +103,47 @@ def load_tools():
         return data.get('programs')
 
 def timeout_user(callers_name: str, user_name: str, length: int):
+    response = "timeout_user_is_not_ready_yet"
     russian_roulette = random.randint(0,99)
     print(russian_roulette)
     moderators = tw.get_moderators_formatted()
 
     exists = user_name.lower() in moderators
 
-    if russian_roulette < 97 or exists:
+    if russian_roulette < 95 or exists:
         user_name = callers_name
 
     # Make this a condom?
     if type(length) is int:
+        print("118")
         if length == 0 or length > 100 or length < 0:
             length = 10
-            response = tw.timeout_user(user_name, length)
+        response = tw.timeout_user(user_name, length)
+        error = response.get('error')
+        if error != None:
+            print(error)
+            answer = response
+        else:
+            print(response.get('data',{})[0].get('end_time',{}))
+            answer = f"Successfully timed out {user_name} for {length}"
     else:
         try:
+            print("125")
             if length == 0 or length > 100 or length < 0:
                 length = 10
-                length = int(length)
-                response = tw.timeout_user(user_name, length)
+            response = tw.timeout_user(user_name, length)
+            error = response.get('error')
+            if error != None:
+                print(error)
+                answer = response
+            else:
+                print(response.get('data',{})[0].get('end_time',{}))
+                answer = f"Successfully timed out {user_name} for {length}"
         except Exception as e:
             print(repr(e))
 
-    return response
+    print(f"==146 openai== {answer=}")
+    return answer
 
 def get_current_weather(location: str, unit: str = "celsius"):
     response = f"Failed to get the weather for {location}"
@@ -230,6 +247,10 @@ class OpenAI_Bot():
                         for tc in tool_calls
                     ]
                 })
+                
+                print("===============================================")
+                print(self.chat_history[-1])
+                print("===============================================")
 
                 for tool_call in tool_calls:
                     args = json.loads(tool_call.function.arguments)
@@ -241,7 +262,6 @@ class OpenAI_Bot():
                         "content": json.dumps(result),
                         "tool_call_id": tool_call.id
                     })
-                    print(f"{self.chat_history}")
                 final_response = await client.chat.completions.create(
                     model="deepseek-chat",
                     messages=self.chat_history
@@ -254,6 +274,8 @@ class OpenAI_Bot():
             print("297 ########################################################################")
             print(f"{self.chat_history=}")
             print("An exception occurred:", str(e))
+            print("An exception occurred:", e.args)
+            print("An exception occurred:", type(e))
             response = ERROR_MSG
             response["choices"][0]["message"] = {'role': 'assistant', 'content': 'Sorry, there was an exception. '+str(e)}
             self.reset_memory()
