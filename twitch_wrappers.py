@@ -122,7 +122,7 @@ def timeout_user(user_name: str, length: int):
     response = requests.post(url, headers=headers, json=data)
     print(f"=tw.timeout_user====={data}")
     print(f"=tw.timeout_user====={response}")
-    print(f"=tw.timeout_user================{response.json()=}")
+    print(f"=tw.timeout_user====={response.json()=}")
     return response.json()
 
 # def full_timeout_user(user_name: str, length: int):

@@ -96,6 +96,15 @@ def speech_listener(listen_for):
 ####################### ALL OF THE TOOLS GO HERE #######################
 ########################################################################
 
+def print_error(e, response):
+    print("============ There was an error! ============")
+    print(f"Exception type: {type(e).__name__}")  # Log exception type
+    print(f"Exception message: {str(e)}")
+    print("Full response:", response)
+    print(f"{response=}")
+    print(f"{response.json()=}")
+    print("============ There was an error! ============")
+
 def load_tools():
     with open('dabi_programs.json', 'r') as f:
         data = json.load(f)
@@ -113,36 +122,40 @@ def timeout_user(callers_name: str, user_name: str, length: int):
     if russian_roulette < 95 or exists:
         user_name = callers_name
 
-    # Make this a condom?
     if type(length) is int:
-        print("118")
         if length == 0 or length > 100 or length < 0:
             length = 10
         response = tw.timeout_user(user_name, length)
         error = response.get('error')
-        if error != None:
+        if error is not None:
             print(error)
             answer = response
         else:
-            print(response.get('data',{})[0].get('end_time',{}))
-            answer = f"Successfully timed out {user_name} for {length}"
+            try:
+                print(response.get('data',[])[0].get('end_time',{}))
+                answer = f"Successfully timed out {user_name} for {length}"
+            except Exception as e:
+                print("Top Exception Zone")
+                print_error(e, response)
     else:
         try:
-            print("125")
             if length == 0 or length > 100 or length < 0:
                 length = 10
             response = tw.timeout_user(user_name, length)
             error = response.get('error')
-            if error != None:
+            if error is not None:
                 print(error)
                 answer = response
             else:
-                print(response.get('data',{})[0].get('end_time',{}))
-                answer = f"Successfully timed out {user_name} for {length}"
+                try:
+                    print(response.get('data',[])[0].get('end_time',{}))
+                    answer = f"Successfully timed out {user_name} for {length}"
+                except Exception as e:
+                    print("Lower Exception Zone")
+                    print_error(e, response)
         except Exception as e:
             print(repr(e))
 
-    print(f"==146 openai== {answer=}")
     return answer
 
 def get_current_weather(location: str, unit: str = "celsius"):
@@ -155,7 +168,6 @@ def get_current_weather(location: str, unit: str = "celsius"):
     except Exception as e:
         print(repr(e))
 
-    print(f"{response=}")
     return response.json()
 
 ########################################################################
@@ -272,7 +284,6 @@ class OpenAI_Bot():
 
         except Exception as e:
             print("297 ########################################################################")
-            print(f"{self.chat_history=}")
             print("An exception occurred:", str(e))
             print("An exception occurred:", e.args)
             print("An exception occurred:", type(e))
