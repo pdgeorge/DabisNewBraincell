@@ -4,7 +4,7 @@
             "type": "function",
             "function": {
                 "name": "timeout_user",
-                "description": "Timeout a user for a period of time",
+                "description": "Timeout one user for a period of time",
                 "parameters": {
                     "type": "object",
                     "properties": {

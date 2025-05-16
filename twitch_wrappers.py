@@ -97,6 +97,7 @@ def get_user_id(user):
     
 def timeout_user(user_name: str, length: int):
     user_id = get_user_id(user_name)
+    response = "Error"
     print(f"Get user_id = {user_id=}")
 
     # user_id = response.get('data', {})[0].get('id', {})
@@ -119,6 +120,9 @@ def timeout_user(user_name: str, length: int):
     }
 
     response = requests.post(url, headers=headers, json=data)
+    print(f"=tw.timeout_user====={data}")
+    print(f"=tw.timeout_user====={response}")
+    print(f"=tw.timeout_user====={response.json()=}")
     return response.json()
 
 # def full_timeout_user(user_name: str, length: int):
