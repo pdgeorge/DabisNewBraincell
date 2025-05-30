@@ -11,7 +11,6 @@ from pyht.client import TTSOptions
 import wave
 from scipy.io import wavfile
 import sounddevice as sd
-from pydub import AudioSegment
 import time
 import math
 import requests
@@ -24,6 +23,7 @@ from pydub.playback import _play_with_simpleaudio
 from dotenv import load_dotenv
 import twitch_wrappers as tw
 import random
+import play
 
 load_dotenv()
 
@@ -110,6 +110,10 @@ def load_tools():
         data = json.load(f)
     if data:
         return data.get('programs')
+
+def send_right_paddle(val=0):
+    print(f"Sending {val} to send_right_paddle.")
+    play.send_right_paddle(val)
 
 def timeout_user(callers_name: str, user_name: str, length: int):
     response = "timeout_user_is_not_ready_yet"
