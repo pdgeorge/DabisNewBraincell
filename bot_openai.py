@@ -113,11 +113,18 @@ def load_tools():
     if data:
         return data.get('programs')
 
-def send_right_paddle(val=0):
+async def send_right_paddle(val: int):
     print(f"Sending {val} to send_right_paddle.")
     breakout_play.send_right_paddle(val)
 
-def timeout_user(callers_name: str, user_name: str, length: int):
+async def play_breakout(val: int):
+    print(f"{val=}")
+    if val > 100 or val <= 0:
+        val = 50
+    answer = await breakout_play.connect_temp(val)
+    return answer
+
+async def timeout_user(callers_name: str, user_name: str, length: int):
     response = "timeout_user_is_not_ready_yet"
     russian_roulette = random.randint(0,99)
     print(russian_roulette)
@@ -166,7 +173,7 @@ def timeout_user(callers_name: str, user_name: str, length: int):
 
     return answer
 
-def get_current_weather(location: str, unit: str = "celsius"):
+async def get_current_weather(location: str, unit: str = "celsius"):
     response = f"Failed to get the weather for {location}"
 
     try:
@@ -275,7 +282,7 @@ class OpenAI_Bot():
                 for tool_call in tool_calls:
                     args = json.loads(tool_call.function.arguments)
 
-                    result = globals()[tool_call.function.name](**args)
+                    result = await globals()[tool_call.function.name](**args)
 
                     self.chat_history.append({
                         "role": "tool",
