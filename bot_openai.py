@@ -21,9 +21,9 @@ import pyaudio
 from pydub import AudioSegment
 from pydub.playback import _play_with_simpleaudio
 from dotenv import load_dotenv
-import twitch_wrappers as tw
+from twitch_wrappers import TW
 import random
-import play
+import breakout_play
 
 load_dotenv()
 
@@ -49,6 +49,8 @@ client = AsyncOpenAI(
     base_url=BASE_URL,
     api_key=APIKEY
 )
+
+tw = TW(0)
 
 ERROR_MSG = {
     "choices": [
@@ -113,7 +115,7 @@ def load_tools():
 
 def send_right_paddle(val=0):
     print(f"Sending {val} to send_right_paddle.")
-    play.send_right_paddle(val)
+    breakout_play.send_right_paddle(val)
 
 def timeout_user(callers_name: str, user_name: str, length: int):
     response = "timeout_user_is_not_ready_yet"
@@ -123,14 +125,15 @@ def timeout_user(callers_name: str, user_name: str, length: int):
 
     exists = user_name.lower() in moderators
 
-    if russian_roulette < 95 or exists:
+    if (russian_roulette < 95 or exists) and callers_name.upper() != 'PDGEORGE':
         user_name = callers_name
 
     if type(length) is int:
         if length == 0 or length > 100 or length < 0:
             length = 10
         response = tw.timeout_user(user_name, length)
-        error = response.get('error')
+        error = response.get('error', None)
+        print(f"{response=}, {error=}")
         if error is not None:
             print(error)
             answer = response
@@ -146,7 +149,8 @@ def timeout_user(callers_name: str, user_name: str, length: int):
             if length == 0 or length > 100 or length < 0:
                 length = 10
             response = tw.timeout_user(user_name, length)
-            error = response.get('error')
+            error = response.get('error', None)
+            print(f"{response=}, {error=}")
             if error is not None:
                 print(error)
                 answer = response
