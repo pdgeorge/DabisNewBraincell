@@ -1,3 +1,7 @@
+snake_play/
+breakout_play/
+model/
+
 # Specific files
 test*
 *.mp3

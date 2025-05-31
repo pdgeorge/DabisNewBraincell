@@ -31,25 +31,6 @@
         {
             "type": "function",
             "function": {
-                "name": "send_right_paddle",
-                "description": "Control your paddle in the game of breakout",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "val": {
-                            "type": "number",
-                            "description": "Position between 0 and 500 for where your paddle should be on the board"
-                        }
-                    },
-                    "required": [
-                        "val"
-                    ]
-                }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
                 "name": "play_breakout",
                 "description": "Begin playing breakout for a period of time (up to 100 seconds) against Twitch chat, who have a severe disadvantage against you. You will then care strongly about the score",
                 "parameters": {

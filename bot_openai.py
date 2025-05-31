@@ -50,7 +50,7 @@ client = AsyncOpenAI(
     api_key=APIKEY
 )
 
-tw = TW(0)
+tw = TW()
 
 ERROR_MSG = {
     "choices": [
