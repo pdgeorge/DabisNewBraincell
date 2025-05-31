@@ -3,25 +3,22 @@ import json
 import os
 import requests
 import websockets
-import twitch_wrappers as tw
+from twitch_wrappers import TW
 from dotenv import load_dotenv
 
 load_dotenv()
 
-
-
 followers = None
 global_twitch_queue = None
 global_chat_mode = False
+tw = TW(1)
 
 # ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN')   # Generated from your authentication mechanism, make sure it is scoped properly
 CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')   # The channel ID of the channel you want to join
 CLIENT_ID = os.getenv('DABI_CLIENT_ID')         # The same Client ID used to generate the access token
-ACCESS_TOKEN = None
 
 async def handle_twitch_msg(event):
     global global_twitch_queue
-
     to_send = await extract_message_to_send_chat(event)
     print(f"handle_twitch_msg {to_send=}")
     global_twitch_queue.put(json.dumps(to_send))
@@ -175,7 +172,7 @@ async def on_message(ws, message):
             response = requests.post(
                 'https://api.twitch.tv/helix/eventsub/subscriptions',
                 headers={
-                    'Authorization': f'Bearer {ACCESS_TOKEN}',
+                    'Authorization': f'Bearer {tw.access_token}',
                     'Client-Id': CLIENT_ID,
                     'Content-Type': 'application/json',
                     'Accept': 'application/vnd.twitchtv.v5+json',
@@ -244,7 +241,7 @@ async def grab_followers():
 
     headers = {
         'Client-ID': CLIENT_ID,
-        'Authorization': f'Bearer {ACCESS_TOKEN}',
+        'Authorization': f'Bearer {tw.access_token}',
     }
     
     url = f'https://api.twitch.tv/helix/channels/followers?broadcaster_id={CHANNEL_ID}'
@@ -275,8 +272,6 @@ async def main():
 def start_events(twitch_queue, chat_mode):
     global global_twitch_queue
     global global_chat_mode
-    global ACCESS_TOKEN
-    ACCESS_TOKEN = tw.update_key()
     global_twitch_queue = twitch_queue
     global_chat_mode = chat_mode
     print("TwitchEvent process has started")
@@ -286,8 +281,6 @@ async def test_main():
     import multiprocessing
     global global_twitch_queue
     global global_chat_mode
-    global ACCESS_TOKEN
-    ACCESS_TOKEN = tw.update_key()
     global_chat_mode = False
     global_twitch_queue = multiprocessing.Queue()
     print("Running the test version")

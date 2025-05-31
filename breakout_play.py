@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 global_gameplay_queue = None
+final_score = None
 sio = socketio.AsyncClient()
 
 async def get_input():
@@ -19,7 +20,6 @@ async def get_input():
 async def send_paddleMove(side, pos):
     # client_msg = f'{{ "side": "{side}", "y": {pos} }}'
     client_msg={"side": side, "y": pos }
-    print(client_msg)
     await sio.emit('paddleMove', client_msg)
 
 async def send_right_paddle(pos):
@@ -73,25 +73,20 @@ async def handler():
 @sio.event
 async def connect():
     print('Connected to server')
-    asyncio.create_task(handler())
+    # asyncio.create_task(handler()) # Use for testing by yourself
 
 @sio.event
 async def gameState(data):
+    global final_score
     try:
         if data['paddles']['left']['score'] > 0 or data['paddles']['right']['score'] > 0:
-            print(f"Score changed! L: {data['paddles']['left']['score']} | R: {data['paddles']['right']['score']}")
-            print(f"{data['ball']['y']=}")
-            print(f"{data['ball']['x']=}")
-            print(f"{data['ball']['dx']=}")
-            print(f"{data['ball']['dy']=}")
             if data['ball']['x'] < 400:
                 await send_left_paddle(data['ball']['y'] - 50)
             if data['ball']['x'] > 400:
                 await send_right_paddle(data['ball']['y'] - 50)
-        
         if not any(block['active'] for block in data['blocks']):
-            print("All blocks destroyed!")
             await send_reset("reset")
+        final_score = f"Dabi's score = {data['paddles']['left']['score']}, Twitch chat's score {data['paddles']['right']['score']}"
     except Exception as e:
         print(repr(e))
         print(data)
@@ -100,6 +95,15 @@ async def gameState(data):
 @sio.event
 async def disconnect():
     print('Disconnected from server')
+
+async def connect_temp(val):
+    global final_score
+    await sio.connect('http://localhost:3000')
+    await asyncio.sleep(val)
+    print("Calling disconnect within connect_temp")
+    await sio.disconnect()
+    print(f"{final_score=}")
+    return final_score
 
 async def main():
     try:

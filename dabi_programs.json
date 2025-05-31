@@ -50,6 +50,25 @@
         {
             "type": "function",
             "function": {
+                "name": "play_breakout",
+                "description": "Begin playing breakout for a period of time (up to 100 seconds) against Twitch chat, who have a severe disadvantage against you. You will then care strongly about the score",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "val": {
+                            "type": "number",
+                            "description": "Value between 0 and 100 for how long you will play breakout against Twitch chat"
+                        }
+                    },
+                    "required": [
+                        "val"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "get_current_weather",
                 "description": "Get current weather information",
                 "parameters": {
