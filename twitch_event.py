@@ -11,7 +11,7 @@ load_dotenv()
 followers = None
 global_twitch_queue = None
 global_chat_mode = False
-tw = TW(1)
+tw = TW()
 
 # ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN')   # Generated from your authentication mechanism, make sure it is scoped properly
 CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')   # The channel ID of the channel you want to join
@@ -275,6 +275,8 @@ def start_events(twitch_queue, chat_mode):
     global_twitch_queue = twitch_queue
     global_chat_mode = chat_mode
     print("TwitchEvent process has started")
+    tw.update_key()
+    tw.validate()
     asyncio.run(main())
 
 async def test_main():

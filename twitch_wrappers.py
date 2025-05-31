@@ -14,7 +14,7 @@ CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')
 USER_ID = os.getenv('BOT_USER_ID')
 
 class TW():
-    def __init__(self, first_run):
+    def __init__(self):
         self.client_id = CLIENT_ID
         self.client_secret = CLIENT_SECRET
         self.refresh_token = REFRESH_TOKEN
@@ -22,9 +22,6 @@ class TW():
         self.access_token = ACCESS_TOKEN
         self.channel_id = CHANNEL_ID
         self.user_id = USER_ID
-        if first_run == 1:
-            self.update_key()
-        self.validate()
 
     def get_users_formatted(self):
         response = self.get_users()
@@ -206,7 +203,7 @@ class TW():
 
 # A list of example usages and testing
 if __name__ == "__main__":
-    tw = TW(1) # 1 for first run, 0 for any subsequent running
+    tw = TW() # 1 for first run, 0 for any subsequent running
     print("Moderators!")
     response = tw.get_moderators_formatted()
     print(response)
