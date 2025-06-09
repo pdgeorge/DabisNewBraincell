@@ -115,7 +115,7 @@ def load_tools():
 
 async def send_right_paddle(val: int):
     print(f"Sending {val} to send_right_paddle.")
-    breakout_play.send_right_paddle(val)
+    await breakout_play.send_right_paddle(val)
 
 async def play_breakout(val: int):
     print(f"{val=}")
