@@ -33,11 +33,11 @@ async def extract_message_to_send_chat(event):
     formatted_msg = f"twitch:{msg_username}: {msg_msg}"
 
     formatted_return = {
-                "msg_user": msg_username,
-                "msg_server": msg_server,
-                "msg_msg": msg_msg,
-                "formatted_msg": formatted_msg
-            }
+        "msg_user": msg_username,
+        "msg_server": msg_server,
+        "msg_msg": msg_msg,
+        "formatted_msg": formatted_msg
+    }
     
     print(formatted_return)
     return formatted_return
