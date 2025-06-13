@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from twitch_wrappers import TW
 import random
 import breakout_play
+from dabi_logging import dabi_print
 
 load_dotenv()
 
@@ -74,38 +75,19 @@ def normalise_dir(dir):
     normalised_dir = os.path.normpath(os.path.join(current_dir, dir))
     return normalised_dir
 
-def speech_listener(listen_for):
-    r = sr.Recognizer()
-    transcription = "Not yet"
-    with sr.Microphone() as source:
-        print("Recording started")
-        try:
-            audio = r.listen(source, timeout=listen_for, phrase_time_limit=listen_for)  # Capture the audio input
-        except sr.WaitTimeoutError:
-            print(f"No speech detected before {listen_for} seconds.")
-            return "" # No audio recorded, no string to transcribe, no string to return
-    try:
-        transcription = r.recognize_google(audio)  # Perform the speech-to-text transcription
-    except sr.UnknownValueError:
-        print("Speech recognition could not understand audio")
-        transcription = "Error"
-    except sr.RequestError as e:
-        print("Could not request speech recognition results; {0}".format(e))
-        transcription = "Error"
-    return transcription
-
 ########################################################################
 ####################### ALL OF THE TOOLS GO HERE #######################
 ########################################################################
 
-def print_error(e, response):
-    print("============ There was an error! ============")
-    print(f"Exception type: {type(e).__name__}")  # Log exception type
-    print(f"Exception message: {str(e)}")
-    print("Full response:", response)
-    print(f"{response=}")
-    print(f"{response.json()=}")
-    print("============ There was an error! ============")
+def print_error(e, response=None):
+    dabi_print("============ There was an error! ============")
+    dabi_print(f"Exception type: {type(e).__name__}")  # Log exception type
+    dabi_print(f"Exception message: {str(e)}")
+    if response is not None:
+        dabi_print("Full response:", response)
+        dabi_print(f"{response=}")
+        dabi_print(f"{response.json()=}")
+    dabi_print("============ There was an error! ============")
 
 def load_tools():
     with open('dabi_programs.json', 'r') as f:
@@ -114,11 +96,11 @@ def load_tools():
         return data.get('programs')
 
 async def send_right_paddle(val: int):
-    print(f"Sending {val} to send_right_paddle.")
+    dabi_print(f"Sending {val} to send_right_paddle.")
     await breakout_play.send_right_paddle(val)
 
 async def play_breakout(val: int):
-    print(f"{val=}")
+    dabi_print(f"{val=}")
     if val > 100 or val <= 0:
         val = 50
     answer = await breakout_play.connect_temp(val)
@@ -127,7 +109,7 @@ async def play_breakout(val: int):
 async def timeout_user(callers_name: str, user_name: str, length: int):
     response = "timeout_user_is_not_ready_yet"
     russian_roulette = random.randint(0,99)
-    print(russian_roulette)
+    dabi_print(f"{callers_name=}, {user_name=}, {length=}, {russian_roulette=}")
     moderators = tw.get_moderators_formatted()
 
     exists = user_name.lower() in moderators
@@ -140,16 +122,15 @@ async def timeout_user(callers_name: str, user_name: str, length: int):
             length = 10
         response = tw.timeout_user(user_name, length)
         error = response.get('error', None)
-        print(f"{response=}, {error=}")
+        dabi_print(f"{response=}, {error=}")
         if error is not None:
-            print(error)
+            dabi_print(error)
             answer = response
         else:
             try:
-                print(response.get('data',[])[0].get('end_time',{}))
+                dabi_print(response.get('data',[])[0].get('end_time',{}))
                 answer = f"Successfully timed out {user_name} for {length}"
             except Exception as e:
-                print("Top Exception Zone")
                 print_error(e, response)
     else:
         try:
@@ -157,19 +138,18 @@ async def timeout_user(callers_name: str, user_name: str, length: int):
                 length = 10
             response = tw.timeout_user(user_name, length)
             error = response.get('error', None)
-            print(f"{response=}, {error=}")
+            dabi_print(f"{response=}, {error=}")
             if error is not None:
-                print(error)
+                dabi_print(error)
                 answer = response
             else:
                 try:
-                    print(response.get('data',[])[0].get('end_time',{}))
+                    dabi_print(response.get('data',[])[0].get('end_time',{}))
                     answer = f"Successfully timed out {user_name} for {length}"
                 except Exception as e:
-                    print("Lower Exception Zone")
                     print_error(e, response)
         except Exception as e:
-            print(repr(e))
+            dabi_print(e)
 
     return answer
 
@@ -181,7 +161,7 @@ async def get_current_weather(location: str, unit: str = "celsius"):
         geocoding = response.json().get('results')[0]
         response = requests.get(f"https://api.open-meteo.com/v1/forecast?latitude={geocoding.get('latitude')}&longitude={geocoding.get('longitude')}&current=temperature_2m&temperature_unit={unit}")
     except Exception as e:
-        print(repr(e))
+        dabi_print(e)
 
     return response.json()
 
@@ -204,8 +184,6 @@ class OpenAI_Bot():
         temp_bot_file = f"{self.bot_name}.txt"
         self.bot_file = os.path.join(path,temp_bot_file)
         self.tools = load_tools()
-        print(self.tools)
-
         self.last_pulled = "youtube" # Useful only if doing GamingAssistant project
         self.mode = "colab" # Useful only if doing GamingAssistant project
 
@@ -218,7 +196,7 @@ class OpenAI_Bot():
         self.total_tokens = 0
 
         # "I am alive!"
-        print("Bot initialised, name: " + self.bot_name)
+        dabi_print("Bot initialised, name: " + self.bot_name)
 
     # Load message history from file
     def load_from_file(self, load_from):
@@ -226,7 +204,6 @@ class OpenAI_Bot():
             data = json.load(f)
         if data:
             self.chat_history = data
-            print(self.chat_history)
 
     def save_json_to_file(self, contents, dir):
         with open(dir, 'w+') as json_file:
@@ -240,9 +217,6 @@ class OpenAI_Bot():
         to_send['content'] = data_to_give
         self.chat_message = to_send
         tool_calls = None
-
-        print("chat message is: ")
-        print(to_send)
 
         self.chat_history.append(self.chat_message)
         try:
@@ -276,7 +250,7 @@ class OpenAI_Bot():
                 })
                 
                 print("===============================================")
-                print(self.chat_history[-1])
+                dabi_print(f"Tool call: {self.chat_history[-1]=}")
                 print("===============================================")
 
                 for tool_call in tool_calls:
@@ -298,20 +272,17 @@ class OpenAI_Bot():
                 response = response
 
         except Exception as e:
-            print("297 ########################################################################")
-            print("An exception occurred:", str(e))
-            print("An exception occurred:", e.args)
-            print("An exception occurred:", type(e))
+            print_error(e)
             response = ERROR_MSG
             response["choices"][0]["message"] = {'role': 'assistant', 'content': 'Sorry, there was an exception. '+str(e)}
             self.reset_memory()
 
         bot_response = {}
-        print(response)
         bot_response["role"] = response.choices[0].message.role
         bot_response["content"] = response.choices[0].message.content
         self.chat_history.append(bot_response)
 
+        dabi_print(f"{bot_response=}")
         if response.usage.total_tokens > 3500:
             del self.chat_history[1]
             del self.chat_history[1]
@@ -371,7 +342,7 @@ class OpenAI_Bot():
         if response.status_code == 200:
             with open(msg_file_path, "wb") as f:
                 f.write(response.content)
-            print(f"MP3 saved as {msg_file_path}")
+            dabi_print(f"MP3 saved as {msg_file_path}")
             
             audio = AudioSegment.from_mp3(msg_file_path)
             duration_ms = len(audio)
@@ -379,8 +350,8 @@ class OpenAI_Bot():
             
             return msg_file_path, duration_sec
         else: 
-            print(f"Failed code {response.status_code}")
-            print(f"Response: {response.text}")
+            dabi_print(f"Failed code {response.status_code}")
+            dabi_print(f"Response: {response.text}")
 
     # Allows you to choose which audio channel to output to using device_id
     def read_message_choose_device(self, msg_file_path, device_id):
@@ -405,12 +376,6 @@ class OpenAI_Bot():
         stream.stop_stream()
         stream.close()
         p.terminate()
-
-    # Listens to the audio input when connected in Discord
-    def discord_colab(self, listen_for):
-        heard_msg = speech_listener(listen_for)
-        print("heard_msg is: "+heard_msg)
-        return heard_msg
 
     def turn_to_wav(self, wavify, name):
         sample_width = 2
@@ -571,25 +536,6 @@ async def testing_main():
     # test_bot.read_message(opus_filename)
     # await asyncio.sleep(duration)
     # print("Done")
-
-    ### Test STT -> TTT -> basic TTS ###
-    # results = await test_bot.discord_colab(10)
-    # print(results)
-    # path = await test_bot.playHT_wav_generator("I am Detsy!")
-    # path = "./outputs\\tester\\_Msg589158584504913860.wav"
-    # test_bot.read_message(path)
-    # print("Done playing")
-    # scan_audio_devices()
-    # test_bot.load_from_file(test_bot.bot_file)
-    # response = await test_bot.send_msg("Hello, this is a first message")
-    # response = speech_listener(10)
-    # print(response)
-    # response = await test_bot.send_msg("Is this a second message?")
-    # response = speech_listener(10)
-    # print(response)
-    # response = await test_bot.send_msg("Is this a THIRD message?")
-    # response = speech_listener(10)
-    # print(response)
 
     ### Single message TTT version
     msg_to_test = "Do you like beatsaber?"

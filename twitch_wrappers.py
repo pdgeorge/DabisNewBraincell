@@ -1,6 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv, set_key
+from dabi_logging import dabi_print
 
 load_dotenv()
 
@@ -178,28 +179,28 @@ class TW():
                 return access_token, refresh_token
             else:
                 # Handle errors
-                print("Error refreshing token:", response_data)
+                dabi_print("Error refreshing token:", response_data)
                 return None, None
 
         except Exception as e:
-            print("Exception occurred while refreshing token:", str(e))
+            dabi_print("Exception occurred while refreshing token:", str(e))
             return None, None
         
     def update_access_token_in_env(self, access_token, env_file):
         try:
             set_key(env_file, "DABI_ACCESS_TOKEN", access_token)
         except Exception as e:
-            print("Failed to update .env file:", str(e))
+            dabi_print("Failed to update .env file:", str(e))
 
     def update_key(self):
         new_access_token, new_refresh_token = self.refresh_access_token(CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN)
         if new_access_token:
-            print("Token refresh successful!")
+            dabi_print("Token refresh successful!")
             self.update_access_token_in_env(new_access_token, ENV_FILE)
             self.validate()
             return new_access_token
         else:
-            print("Token refresh failed.")
+            dabi_print("Token refresh failed.")
 
 # A list of example usages and testing
 if __name__ == "__main__":
