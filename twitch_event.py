@@ -5,6 +5,7 @@ import requests
 import websockets
 from twitch_wrappers import TW
 from dotenv import load_dotenv
+from dabi_logging import dabi_print
 
 load_dotenv()
 
@@ -20,7 +21,6 @@ CLIENT_ID = os.getenv('DABI_CLIENT_ID')         # The same Client ID used to gen
 async def handle_twitch_msg(event):
     global global_twitch_queue
     to_send = await extract_message_to_send_chat(event)
-    print(f"handle_twitch_msg {to_send=}")
     global_twitch_queue.put(json.dumps(to_send))
 
 async def extract_message_to_send_chat(event):
@@ -39,14 +39,12 @@ async def extract_message_to_send_chat(event):
         "formatted_msg": formatted_msg
     }
     
-    print(formatted_return)
     return formatted_return
 
 async def handle_sub(event):
     global global_twitch_queue
 
     to_send = await extract_message_to_sub(event)
-    print(f"handle_twitch_msg {to_send=}")
     global_twitch_queue.put(json.dumps(to_send))
 
 async def extract_message_to_sub(event):
@@ -65,7 +63,6 @@ async def extract_message_to_sub(event):
                 "formatted_msg": formatted_msg
             }
     
-    print(formatted_return)
     return formatted_return
 
 async def handle_redemptions(event):
@@ -74,12 +71,11 @@ async def handle_redemptions(event):
     match event_title:
         case "Ask Dabi A Q":
             to_send = await extract_message_to_send_points(event)
-            print(f"handle_redemptions {to_send=}")
+            dabi_print(f"{to_send=}")
             global_twitch_queue.put(json.dumps(to_send))
         case "timeout":
-            print("timeout entered")
             formatted_received = await extract_message_to_send_points(event)
-            print(f"{formatted_received=}")
+            dabi_print(f"{formatted_received=}")
             response = await timeout_user(formatted_received)
 
 async def timeout_user(msg):
@@ -119,7 +115,7 @@ async def on_message(ws, message):
     event = json.loads(message)
     if event['metadata']['message_type'] == 'session_welcome':
         session_id = event['payload']['session']['id']
-        print(f'{session_id=}')
+        dabi_print(f'{session_id=}')
         subscribe_array = [
             {
             'type': 'channel.follow',
@@ -168,7 +164,7 @@ async def on_message(ws, message):
                 }
             })
         for subscribe in subscribe_array:
-            print(subscribe)
+            dabi_print(subscribe)
             response = requests.post(
                 'https://api.twitch.tv/helix/eventsub/subscriptions',
                 headers={
@@ -179,7 +175,7 @@ async def on_message(ws, message):
                 },
                 data=json.dumps(subscribe)
             )
-            print(f'{response.content=}')
+            dabi_print(f'{response.content=}')
     
     elif event.get('metadata', {}).get('message_type', {}) == 'session_keepalive':
         pass
@@ -194,46 +190,30 @@ async def on_message(ws, message):
                 "formatted_msg": f"twitch:{event.get('payload', {}).get('event', {}).get('user_login', {})}: Has just followed!"
             }
             global_twitch_queue.put(json.dumps(follow_to_send))
-            print("========================follow_to_send===================")
-            print(json.dumps(follow_to_send))
-            print(event)
-            print("========================follow_to_send===================")
+            dabi_print(json.dumps(follow_to_send))
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.channel_points_custom_reward_redemption.add':
-        ############################################################
-        # Right now, we are receiving ALL channel point redemptions.
-        print(event)
+        dabi_print(event)
         await handle_redemptions(event)
-        ############################################################
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.chat.message' and event.get('payload', {}).get('event', {}).get('channel_points_custom_reward_id', {}) == None:
-        # print("=========================Inside channel.chat.message=========================")
-        # Add in an if statement to check what mode Dabi is in.
-        # If Dabi is in "assist" or "chat" mode, where Dabi will respond to every or almost every chat message.
         await handle_twitch_msg(event)
-        # print(event.get('payload', {}).get('event', {}).get('chatter_user_name', {}))
-        # print(event.get('payload', {}).get('event', {}).get('message', {}).get('text', {}))
-        # print(chanpoint_test_thing)
-        # print("=========================Inside channel.chat.message=========================")
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.subscribe':
-        print("==========================================================")
-        print("Received subscription in the form of:")
-        print(event)
+        dabi_print(event)
         await handle_sub(event)
-        print("==========================================================")
     else:
-        print(event)
+        dabi_print(event)
 
 async def ws_conn():
     url = 'wss://eventsub.wss.twitch.tv/ws'
     async with websockets.connect(url) as ws:
-        print('[ℹ️] Connected to WebSocket')
+        dabi_print('[ℹ️] Connected to WebSocket')
         try:
             while True:
                 message = await ws.recv()
                 await on_message(ws, message)
         except websockets.ConnectionClosed as e:
-            print(f'[❗] WebSocket closed: {e}')
+            dabi_print(f'[❗] WebSocket closed: {e}')
         finally:
-            print('[ℹ️] Closing WebSocket connection...')
+            dabi_print('[ℹ️] Closing WebSocket connection...')
 
 async def grab_followers():
     all_followers = []
@@ -257,7 +237,7 @@ async def grab_followers():
         cursor = data.get('pagination', {}).get('cursor', {})
 
         if not cursor:
-            print(f"{data.get('total', {})=}")
+            dabi_print(f"{data.get('total', {})=}")
             break
 
     return all_followers
@@ -269,12 +249,12 @@ async def main():
 
     await asyncio.gather(ws_conn())
 
-def start_events(twitch_queue, chat_mode):
+def start_events(twitch_queue, chat_mode, dabi_print):
     global global_twitch_queue
     global global_chat_mode
     global_twitch_queue = twitch_queue
     global_chat_mode = chat_mode
-    print("TwitchEvent process has started")
+    dabi_print("TwitchEvent process has started")
     tw.update_key()
     tw.validate()
     asyncio.run(main())
@@ -285,13 +265,13 @@ async def test_main():
     global global_chat_mode
     global_chat_mode = False
     global_twitch_queue = multiprocessing.Queue()
-    print("Running the test version")
+    dabi_print("Running the test version")
     validate_response = tw.validate()
-    print(validate_response)
+    dabi_print(validate_response)
     await main()
 
 if __name__ == "__main__":
     try:
         asyncio.run(test_main())
     except KeyboardInterrupt:
-        print('[❗] Application interrupted. Shutting down...')
+        dabi_print('[❗] Application interrupted. Shutting down...')

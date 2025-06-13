@@ -9,8 +9,7 @@ import game_receiver
 import app
 from dotenv import load_dotenv
 import sys
-import os
-import requests
+from dabi_logging import dabi_print
 
 # Acronyms:
 # TTT = Text To Text. LLM text transformation, text in, text out.
@@ -34,6 +33,7 @@ async def main():
         twitch_queue = multiprocessing.Queue()      # Messages to process for TTT before passing to TTS
         speaking_queue = multiprocessing.Queue()    # Messages to TTS
         game_queue = multiprocessing.Queue()        # Receive from game(s) to pass to TTT
+        dabi_print("--- Dabi Woking Up ---")
 
         listen_to_chat = False # Change whether you want Dabi to listen to chat messages or not
 
@@ -50,7 +50,7 @@ async def main():
 
         ### INGESTORS ###
         # Takes in events from Twitch and sends to twitch_queue
-        event_process = multiprocessing.Process(target=twitch_event.start_events, args=(twitch_queue, listen_to_chat,))
+        event_process = multiprocessing.Process(target=twitch_event.start_events, args=(twitch_queue, listen_to_chat,dabi_print,))
         processes.append(event_process)
 
         # takes in from speaking_queue and speaks through discord
@@ -58,7 +58,11 @@ async def main():
         processes.append(discord_process)
 
         # receives from other external sources (ML games, etc.)
-        game_receiver_process = multiprocessing.Process(target=game_receiver.start_receiving, args=(game_queue,))
+        game_receiver_process = multiprocessing.Process(target=game_receiver.start_receiving, args=(game_queue,), kwargs={
+            "port": 8000,
+            "host": "127.0.0.1",
+            "log_level": "debug",
+        })
         processes.append(game_receiver_process)
         
         ### MAIN APP ###

@@ -11,9 +11,9 @@ from websockets.sync.client import connect
 import sqlite3
 import numpy as np
 from pydub import AudioSegment
-import os
+from dabi_logging import dabi_print
 
-import random 
+import random
 import traceback
 
 from bot_openai import OpenAI_Bot
@@ -80,13 +80,11 @@ def process_audio(audio_path, interval=1):
 
     return rounded_values
 
-# For when dabi is the star of the show
 # Takes in the message received from twitch_connector
 # Removes "twitch:" and "speaks" the message
 async def speak_message(message, dabi):
     to_send = None
     # Twitch section:
-    print(f"{message=}")
     twitch_prefix = "twitch:"
     game_prefix = "game:"
     if message["formatted_msg"].startswith(twitch_prefix):
@@ -95,7 +93,7 @@ async def speak_message(message, dabi):
         send_to_dabi = message["formatted_msg"][len(game_prefix):]
     
     response = await dabi.send_msg(send_to_dabi)
-    print(f"{response=}")
+    dabi_print(f"{response=}")
     if message["msg_server"].isdigit() != True:
         await db_insert(table_name=message["msg_server"], username=message["msg_user"], message=message["msg_msg"], response=response)
     
@@ -107,13 +105,11 @@ async def speak_message(message, dabi):
     to_send["pattern"] = pattern
     to_send["message"] = response
     to_send = json.dumps(to_send)
-    print(f"{to_send=}")
     return to_send, voice_path, voice_duration
 
 async def send_msg_helper(queue, websocket, dabi, speaking_queue):
     to_send = None
     message = queue.get()
-    print(f"app.py send_msg_helper: {message=}")
     
     message = json.loads(message)
     # message = check_for_command(message, dabi)
@@ -125,7 +121,6 @@ async def send_msg_helper(queue, websocket, dabi, speaking_queue):
     # dabi.read_message_choose_device_mp3(voice_path, CABLE_A_OUTPUT)
     speaking_queue.put(voice_path)
     await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
-    print("Done speaking")
 
 async def send_msg(websocket, path, dabi, twitch_queue, game_queue, speaking_queue):
     if twitch_queue.qsize() > 0:
@@ -135,13 +130,12 @@ async def send_msg(websocket, path, dabi, twitch_queue, game_queue, speaking_que
         
 
 def load_new_personality(dabi, personality_to_load):
-    print("Load_new_personality")
+    dabi_print("Load_new_personality")
     dabi_name, dabi_voice, dabi_system = load_personality(personality_to_load)
     dabi.bot_name = dabi_name
     dabi.voice = dabi_voice
     dabi.temp_system_message["content"] = dabi_system
     dabi.reset_memory()
-    print(dabi.chat_history)
     
 
 def load_personality(personality_to_load):
@@ -180,7 +174,7 @@ async def main(twitch_queue, game_queue, speaking_queue):
     except Exception as e:
         # error_msg = "./error.mp3"
         # dabi.read_message_choose_device_mp3(error_msg, CABLE_A_OUTPUT)
-        print("An exception occured:", e)
+        dabi_print("An exception occured:", e)
         traceback.print_exc()
           
 def pre_main(twitch_queue, game_queue, speaking_queue):
@@ -191,5 +185,7 @@ def pre_main(twitch_queue, game_queue, speaking_queue):
     asyncio.run(main(twitch_queue, game_queue, speaking_queue))
 
 if __name__ == "__main__":
+    print("=========================================================")
     print("Do not run this solo any more.\nRun this through main.py")
+    print("=========================================================")
     exit(0)

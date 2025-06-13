@@ -1,25 +1,3 @@
-
-"""
-FastAPI-based webhook receiver that pushes incoming JSON payloads into a
-``multiprocessing.Queue``. Designed to be run in its own ``Process``.
-
-Usage example (in your main program)::
-
-    import multiprocessing as mp
-    import game_receiver
-
-    if __name__ == "__main__":
-        event_queue = mp.Queue()
-        receiver_proc = mp.Process(
-            target=game_receiver.start_receiving,
-            args=(event_queue,)
-        )
-        receiver_proc.start()
-        # ... rest of your program ...
-
-Every HTTP ``POST`` to http://<host>:<port>/event containing a JSON body will be
-queued for your main process to consume.
-"""
 import asyncio
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
@@ -50,11 +28,21 @@ def start_receiving(
     @app.get("/health")
     async def health() -> dict[str, str]:  # noqa: D401 – simple verb is fine
         """Lightweight health‑check endpoint for load balancers."""
+        """
+        For testing, use the following curl command, remember to update url and port as needed:
+        curl -X GET http://0.0.0.0:9000/health
+        """
         return {"status": "ok"}
 
     @app.post("/event")
     async def receive_event(request: Request) -> dict[str, str]:
         """Receive an event payload and push it onto the ``event_queue``."""
+        """
+        For testing, use the following curl command, remember to update url and port as needed:
+        curl -X POST http://0.0.0.0:9000/event \
+        -H "Content-Type: application/json" \
+        -d '{"event_type":"TEST","msg_msg":"hello world"}'
+        """
         try:
             payload: Any = await request.json()
         except Exception as exc:  # broad but safe here, we just reject bad JSON
@@ -71,7 +59,7 @@ def start_receiving(
         return {"status": "accepted"}
 
     # Start the ASGI server (blocks until KeyboardInterrupt or process exit)
-    uvicorn.run(app, host=host, port=port, log_level=log_level, access_log=False)
+    uvicorn.run(app, host=host, port=port, log_level=log_level, access_log=True)
 
 async def async_printer(gameplay_queue_test):
     while True:

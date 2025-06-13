@@ -2,10 +2,9 @@
 import discord
 import os
 import json
-# from discord.ext import commands
 from dotenv import load_dotenv
-# import tbone_transcriber
 import asyncio
+from dabi_logging import dabi_print
 
 from pydub import AudioSegment
 
@@ -27,11 +26,11 @@ global_comminicating = False
 
 @bot.event
 async def on_ready():
-    print(f"{bot.user} is ready and online!")
+    dabi_print(f"{bot.user} is ready and online!")
     await tree.sync()
     for guild in bot.guilds:
         await tree.sync(guild=guild)
-    print("Commands synced")
+    dabi_print("Commands synced")
 
 @tree.command(
         name="hello",
@@ -74,23 +73,23 @@ async def listen(interaction: discord.Interaction):
                 await asyncio.sleep(1)
             if global_speaking_queue.qsize() > 0:
                 print("==========vc.is_connected=========")
-                print(f"{vc.is_connected()=}")
+                dabi_print(f"{vc.is_connected()=}")
                 print("==========vc.is_connected=========")
                 to_play = global_speaking_queue.get()
                 vc.stop()
                 vc.play(discord.FFmpegPCMAudio(to_play))
                 to_delay = audio_length(to_play)
-                print(f"Playing {to_play}, it is {to_delay} long")
+                dabi_print(f"Playing {to_play}, it is {to_delay} long")
                 await asyncio.sleep(to_delay + 5)
                 if os.path.exists(to_play):
                     os.remove(to_play)
-                    print(f"{to_play} removed")
+                    dabi_print(f"{to_play} removed")
                 else:
-                    print(f"Unable to remove {to_play}")
+                    dabi_print(f"Unable to remove {to_play}")
                 await asyncio.sleep(0.1)
             await asyncio.sleep(0.1)
     except Exception as e:
-        print(f"Somebody tell George Dabi's braincell asploded: {e}")
+        dabi_print(f"Somebody tell George Dabi's braincell asploded: {e}")
 
 # @bot.slash_command()
 # async def record(ctx: discord.ApplicationContext):  # If you're using commands.Bot, this will also work.
