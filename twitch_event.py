@@ -232,7 +232,11 @@ async def grab_followers():
         data = response.json()
 
         # Collect user_login from the current page
-        all_followers.extend([follower['user_login'] for follower in data['data']])
+        try:
+            all_followers.extend([follower['user_login'] for follower in data['data']])
+        except Exception as e:
+            dabi_print(f"{data=}\n", repr(e))
+
 
         cursor = data.get('pagination', {}).get('cursor', {})
 

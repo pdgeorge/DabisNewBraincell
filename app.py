@@ -80,17 +80,29 @@ def process_audio(audio_path, interval=1):
 
     return rounded_values
 
+async def reset(dabi):
+    dabi.reset_memory()
+    return "Successfully reset memory, Wakey Wakey Dabi!"
+
+async def choose_action(msg, dabi):
+    dabi_print(msg)
+    if 'reset' in msg:
+        return await reset(dabi)
+
 # Takes in the message received from twitch_connector
 # Removes "twitch:" and "speaks" the message
 async def speak_message(message, dabi):
     to_send = None
-    # Twitch section:
+    #
     twitch_prefix = "twitch:"
     game_prefix = "game:"
+    action_prefix = "action:"
     if message["formatted_msg"].startswith(twitch_prefix):
         send_to_dabi = message["formatted_msg"][len(twitch_prefix):]
     if message["formatted_msg"].startswith(game_prefix):
         send_to_dabi = message["formatted_msg"][len(game_prefix):]
+    if message["formatted_msg"].startswith(action_prefix):
+        send_to_dabi = await choose_action(message["formatted_msg"][len(twitch_prefix):], dabi)
     
     response = await dabi.send_msg(send_to_dabi)
     dabi_print(f"{response=}")
