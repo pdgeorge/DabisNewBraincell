@@ -7,7 +7,7 @@ from datetime import datetime
 
 class _DabiPrinter:
     def __init__(self, logfile: str | Path = "dabi.log", mode: str = "a", encoding: str = "utf-8"):
-        self.logfile = Path(f"dabi_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.log")
+        self.logfile = Path(f"./logs/dabi_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.log")
         self._handle = open(self.logfile, mode, encoding=encoding)
         self._handle.write(f"--- Log started {datetime.now():%Y-%m-%d %H:%M:%S} ---\n")
 
