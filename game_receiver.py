@@ -5,12 +5,21 @@ import multiprocessing
 import json
 from typing import Any
 
-def format_string(msg_msg) -> str:
+def format_string_msg(msg_msg) -> str:
     formatted_return = {
         "msg_user": "Dabi",
         "msg_server": "Pdgeorge",
         "msg_msg": msg_msg,
         "formatted_msg": f"game:Dabi: {msg_msg}"
+    }
+    return formatted_return
+
+def format_string_action(msg_msg) -> str:
+    formatted_return = {
+        "msg_user": "Dabi",
+        "msg_server": "Pdgeorge",
+        "msg_msg": msg_msg,
+        "formatted_msg": f"action:Dabi:{msg_msg}"
     }
     return formatted_return
 
@@ -42,6 +51,10 @@ def start_receiving(
         curl -X POST http://0.0.0.0:9000/event \
         -H "Content-Type: application/json" \
         -d '{"event_type":"TEST","msg_msg":"hello world"}'
+        or
+        curl -X POST http://0.0.0.0:9000/event \
+        -H "Content-Type: application/json" \
+        -d '{"event_type":"TEST","action":"reset"}'
         """
         try:
             payload: Any = await request.json()
@@ -50,7 +63,11 @@ def start_receiving(
 
         try:
             if payload.get('msg_msg', None):
-                to_send = format_string(payload.get('msg_msg', None))
+                to_send = format_string_msg(payload.get('msg_msg', None))
+                print(json.dumps(to_send))
+                event_queue.put(json.dumps(to_send))
+            if payload.get('action', None):
+                to_send = format_string_action(payload.get('action', None))
                 print(json.dumps(to_send))
                 event_queue.put(json.dumps(to_send))
         except Exception as exc:
