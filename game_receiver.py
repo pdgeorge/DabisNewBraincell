@@ -1,6 +1,7 @@
 import asyncio
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 import multiprocessing
 import json
 from typing import Any
@@ -19,7 +20,7 @@ def format_string_action(msg_msg) -> str:
         "msg_user": "Dabi",
         "msg_server": "Pdgeorge",
         "msg_msg": msg_msg,
-        "formatted_msg": f"action:Dabi:{msg_msg}"
+        "formatted_msg": f"action:Dabi: {msg_msg}"
     }
     return formatted_return
 
@@ -33,6 +34,14 @@ def start_receiving(
     # The * FORCED everything after it to be called explicitly. IE: start_receiving(queue, host="127.0.0.1", port=8000)
 
     app = FastAPI(title="Game Event Receiver", version="1.0.0")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"]
+    )
 
     @app.get("/health")
     async def health() -> dict[str, str]:  # noqa: D401 – simple verb is fine
