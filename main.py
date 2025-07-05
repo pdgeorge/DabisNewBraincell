@@ -30,7 +30,7 @@ async def main():
         processes = []
 
         ### QUEUES ###
-        twitch_queue = multiprocessing.Queue()      # Messages to process for TTT before passing to TTS
+        input_msg_queue = multiprocessing.Queue()      # Messages to process for TTT before passing to TTS
         speaking_queue = multiprocessing.Queue()    # Messages to TTS
         game_queue = multiprocessing.Queue()        # Receive from game(s) to pass to TTT
         dabi_print("--- Dabi Woking Up ---")
@@ -49,12 +49,12 @@ async def main():
                     print("node ./breakout_play/server.js")
 
         ### INGESTORS ###
-        # Takes in events from Twitch and sends to twitch_queue
-        event_process = multiprocessing.Process(target=twitch_event.start_events, args=(twitch_queue, listen_to_chat,dabi_print,))
+        # Takes in events from Twitch and sends to input_msg_queue
+        event_process = multiprocessing.Process(target=twitch_event.start_events, args=(input_msg_queue, listen_to_chat,dabi_print,))
         processes.append(event_process)
 
         # takes in from speaking_queue and speaks through discord
-        discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(twitch_queue, speaking_queue,))
+        discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(input_msg_queue, speaking_queue,))
         processes.append(discord_process)
 
         # receives from other external sources (ML games, etc.)
@@ -66,8 +66,8 @@ async def main():
         processes.append(game_receiver_process)
         
         ### MAIN APP ###
-        # Takes in from twitch_queue and <>, and sends to speaking_queue
-        app_process = multiprocessing.Process(target=app.pre_main, args=(twitch_queue, game_queue, speaking_queue,))
+        # Takes in from input_msg_queue and <>, and sends to speaking_queue
+        app_process = multiprocessing.Process(target=app.pre_main, args=(input_msg_queue, game_queue, speaking_queue,))
         processes.append(app_process)
 
         for p in processes:

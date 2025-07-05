@@ -134,9 +134,9 @@ async def send_msg_helper(queue, websocket, dabi, speaking_queue):
     speaking_queue.put(voice_path)
     await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
 
-async def send_msg(websocket, path, dabi, twitch_queue, game_queue, speaking_queue):
-    if twitch_queue.qsize() > 0:
-        await send_msg_helper(queue=twitch_queue, websocket=websocket, dabi=dabi, speaking_queue=speaking_queue)
+async def send_msg(websocket, path, dabi, input_msg_queue, game_queue, speaking_queue):
+    if input_msg_queue.qsize() > 0:
+        await send_msg_helper(queue=input_msg_queue, websocket=websocket, dabi=dabi, speaking_queue=speaking_queue)
     if game_queue.qsize() > 0:
         await send_msg_helper(queue=game_queue, websocket=websocket, dabi=dabi, speaking_queue=speaking_queue)
         
@@ -171,14 +171,14 @@ def load_personality(personality_to_load):
     
     return name_to_return, voice_to_return, personality_to_return
 
-async def main(twitch_queue, game_queue, speaking_queue):
+async def main(input_msg_queue, game_queue, speaking_queue):
     dabi_name, dabi_voice, dabi_system = load_personality("mythicalmentor")
     dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
 
     # Reminder to self: 
     # Need to have "A" websocket connection or this won't work.
     async def handler(websocket, path):
-        await send_msg(websocket, path, dabi, twitch_queue, game_queue, speaking_queue)
+        await send_msg(websocket, path, dabi, input_msg_queue, game_queue, speaking_queue)
     
     try:
         async with websockets.serve(handler, "localhost", 8001):
@@ -189,12 +189,12 @@ async def main(twitch_queue, game_queue, speaking_queue):
         dabi_print("An exception occured:", e)
         traceback.print_exc()
           
-def pre_main(twitch_queue, game_queue, speaking_queue):
+def pre_main(input_msg_queue, game_queue, speaking_queue):
     global global_speaking_queue
     global_speaking_queue = speaking_queue
     global global_game_queue
     global_game_queue = game_queue
-    asyncio.run(main(twitch_queue, game_queue, speaking_queue))
+    asyncio.run(main(input_msg_queue, game_queue, speaking_queue))
 
 if __name__ == "__main__":
     print("=========================================================")

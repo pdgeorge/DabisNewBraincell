@@ -1,248 +1,166 @@
-# https://guide.pycord.dev/voice/receiving
-import discord
 import os
-import json
-from dotenv import load_dotenv
 import asyncio
+import tempfile
+
+import discord                 # Pycord 2.5+, `py-cord[voice]`
+import whisper
+from pydub import AudioSegment
+from dotenv import load_dotenv
 from dabi_logging import dabi_print
 
-from pydub import AudioSegment
-
 load_dotenv()
+DISCORD_TOKEN = os.getenv("CYRA_DISCORD")
 
-DISCORD_TOKEN = os.environ.get('CYRA_DISCORD')
+WHISPER_MODEL = whisper.load_model("base") 
+DEFAULT_RECORD = 10
 
-# Create the bot
+# ----------  Discord client  ---------------
 intents = discord.Intents.all()
 intents.message_content = True
-bot = discord.Client(intents=intents)
-tree = discord.app_commands.CommandTree(bot)
+intents.voice_states = True
+
+bot = discord.Bot(intents=intents)
+
+# Helpers -------------------------------------------------
+def audio_length(path: str) -> float:
+    """Return duration of an audio file (seconds) with pydub."""
+    return len(AudioSegment.from_file(path)) / 1000.0
+
 connections = {}
-time_to_listen = 10
-
-global_twitch_queue = None
+global_input_msg_queue = None
 global_speaking_queue = None
-global_comminicating = False
+global_communicating = False
 
+# --------------------------------------------------------
+#  EVENTS
+# --------------------------------------------------------
 @bot.event
 async def on_ready():
     dabi_print(f"{bot.user} is ready and online!")
-    await tree.sync()
-    for guild in bot.guilds:
-        await tree.sync(guild=guild)
-    dabi_print("Commands synced")
+    await bot.sync_commands()
+    dabi_print("Slash commands synced.")
 
-@tree.command(
-        name="hello",
-        description="Say hello to the bot!"
-)
-async def hello(interaction: discord.Interaction):
-    await interaction.response.send_message("Hello, world!")
+# --------------------------------------------------------
+#  SIMPLE COMMANDS
+# --------------------------------------------------------
+@bot.slash_command(name="hello", description="Say hello to the bot!")
+async def hello(ctx: discord.ApplicationContext):
+    await ctx.respond("Hello, world!")
 
-@tree.command(
-        name="ping",
-        description="Ping from Cyra!"
-)
-async def ping(interaction: discord.Interaction):
-    await interaction.response.send_message("pong")
+@bot.slash_command(name="ping", description="Ping from Cyra!")
+async def ping(ctx: discord.ApplicationContext):
+    await ctx.respond("pong")
 
-@tree.command(
-        name="queue_length",
-        description="Queue Length!!"
-)
-async def queue_length(interaction: discord.Interaction):
-    await interaction.response.send_message(f"There are {global_speaking_queue.qsize()} items in the discord queue.")
+@bot.slash_command(name="queue_length", description="How many files are queued for playback?")
+async def queue_length(ctx: discord.ApplicationContext):
+    if global_speaking_queue is None:
+        return await ctx.respond("Speaking queue not initialised", ephemeral=True)
+    await ctx.respond(f"There are {global_speaking_queue.qsize()} items in the Discord queue.")
 
-@tree.command(
-        name="listen",
-        description="Listen Dabi! LISTEN"
-)
-async def listen(interaction: discord.Interaction):
-    await interaction.response.send_message(f"You are currently in {interaction.user.voice.channel.name}")
-    voice = interaction.user.voice
+@bot.slash_command(name="test", description="Debug: show voice info")
+async def test(ctx: discord.ApplicationContext):
+    await ctx.respond(f"{ctx.author.voice=}, {ctx.guild.voice_client}")
+    voice = ctx.author.voice
     if not voice:
-        return await interaction.response.send_message("You aren't in a voice channel!")
-    if not interaction.guild.voice_client:
-        vc = await voice.channel.connect()  # Connect to the voice channel the author is in.
-    else:
-        vc = interaction.guild.voice_client
-    connections.update({interaction.guild.id: vc})  # Updating the cache with the guild and channel.
+        return
+    vc = ctx.guild.voice_client or await voice.channel.connect()
+    connections[ctx.guild.id] = vc
+
+# --------------------------------------------------------
+#  LISTEN command – plays audio files from speaking_queue
+# --------------------------------------------------------
+@bot.slash_command(name="listen", description="Play back items from the speaking queue")
+async def listen(ctx: discord.ApplicationContext):
+    voice = ctx.author.voice
+    if not voice:
+        return await ctx.respond("You aren't in a voice channel!")
+
+    await ctx.respond(f"🎧 Listening … (voice channel **{voice.channel.name}**)")
+
+    vc = ctx.guild.voice_client or await voice.channel.connect()
+    connections[ctx.guild.id] = vc
+
     try:
         while True:
             if vc.is_playing():
                 await asyncio.sleep(1)
-            if global_speaking_queue.qsize() > 0:
-                print("==========vc.is_connected=========")
-                dabi_print(f"{vc.is_connected()=}")
-                print("==========vc.is_connected=========")
+                continue
+
+            if global_speaking_queue and global_speaking_queue.qsize() > 0:
                 to_play = global_speaking_queue.get()
                 vc.stop()
                 vc.play(discord.FFmpegPCMAudio(to_play))
-                to_delay = audio_length(to_play)
-                dabi_print(f"Playing {to_play}, it is {to_delay} long")
-                await asyncio.sleep(to_delay + 5)
-                if os.path.exists(to_play):
+                delay = audio_length(to_play) + 0.5
+                dabi_print(f"Playing {to_play} ({delay:.1f}s)")
+                await asyncio.sleep(delay)
+                try:
                     os.remove(to_play)
-                    dabi_print(f"{to_play} removed")
-                else:
-                    dabi_print(f"Unable to remove {to_play}")
-                await asyncio.sleep(0.1)
+                except OSError:
+                    pass
             await asyncio.sleep(0.1)
     except Exception as e:
-        dabi_print(f"Somebody tell George Dabi's braincell asploded: {e}")
+        dabi_print(f"Error in listen loop: {e}")
 
-# @bot.slash_command()
-# async def record(ctx: discord.ApplicationContext):  # If you're using commands.Bot, this will also work.
-#     await ctx.respond(f"You are currently in {ctx.author.voice.channel.name}")
-#     voice = ctx.author.voice
-#     if not voice:
-#         return await ctx.respond("You aren't in a voice channel!")
-#     if not ctx.voice_client:
-#         vc = await voice.channel.connect()  # Connect to the voice channel the author is in.
-#     else:
-#         vc = ctx.voice_client
-#     connections.update({ctx.guild.id: vc})  # Updating the cache with the guild and channel.
+# --------------------------------------------------------
+#  /TRANSCRIBE  – join, record N seconds, Whisper transcribe
+# --------------------------------------------------------
+@bot.slash_command(name="transcribe", description="Record and transcribe this voice channel")
+async def transcribe(
+    ctx: discord.ApplicationContext,
+    seconds: discord.Option(int, "Seconds to record (1‑120)", default=DEFAULT_RECORD, min_value=1, max_value=120) # type: ignore
+):
+    if not ctx.author.voice:
+        return await ctx.respond("❌ You must be in a voice channel.", ephemeral=True)
 
-#     vc.start_recording(
-#         discord.sinks.WaveSink(),  # The sink type to use.
-#         once_done,  # What to do once done.
-#         ctx.channel  # The channel to disconnect from.
-#     )
-#     await ctx.respond("Started recording!")
-#     await asyncio.sleep(time_to_listen)
-#     await stop_recording(ctx)
+    voice_channel = ctx.author.voice.channel
+    await ctx.respond(f"🎙️ Recording for **{seconds} s** …")
 
-# @bot.slash_command()
-# async def update_time(ctx: discord.ApplicationContext, new_time: int = discord.Option(description="Enter the new time in seconds", min=1, max=999)):
-#     global time_to_listen
-#     time_to_listen = new_time
-#     await ctx.respond(f"Updated time to {time_to_listen}")
+    # Connect or move to author’s channel
+    vc: discord.VoiceClient
+    if ctx.guild.voice_client:
+        vc = ctx.guild.voice_client
+        if vc.channel != voice_channel:
+            await vc.move_to(voice_channel)
+    else:
+        vc = await voice_channel.connect()
 
-# @bot.slash_command()
-# async def stop_communicate(ctx: discord.ApplicationContext, stop: int = discord.Option(description="Should Dabi Stop?", min=0, max=1)):
-#     global global_comminicating
-#     await ctx.respond(f"{stop=}")
-#     if stop == 1:
-#         global_comminicating = True
-#         await ctx.respond(f"Dabi is non-stop")
-#     if stop == 0:
-#         global_comminicating = False
-#         await ctx.respond(f"Dabi is now stop")
+    sink = discord.sinks.WaveSink()        # separate WAV per speaker
 
-# @bot.slash_command()
-# async def communicate(ctx: discord.ApplicationContext):
-#     global global_comminicating
-#     voice = ctx.author.voice
-#     if not voice:
-#         return await ctx.respond("You aren't in a voice channel!")
-#     if not ctx.voice_client:
-#         vc = await voice.channel.connect()  # Connect to the voice channel the author is in.
-#     else:
-#         vc = ctx.voice_client
-#     connections.update({ctx.guild.id: vc})  # Updating the cache with the guild and channel.
-#     await ctx.respond("Time for some chatting!")
-#     try:
-#         global_comminicating = True
-#         while global_comminicating:
-#             await record(ctx)
-#             await asyncio.sleep(time_to_listen)
-#             await asyncio.sleep(0.1)
-#     except Exception as e:
-#         print(f"Somebody tell George there has been an error in my braincell: {e}")
-#         # TODO add a way for Dabi to scream that. Either once or loop it.
+    async def on_finish(sink: discord.sinks.Sink, *args):
+        lines = []
+        for uid, audio in sink.audio_data.items():
+            # Save to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                audio.file.seek(0)
+                tmp.write(audio.file.read())
+                wav_path = tmp.name
 
-# async def stop_recording(ctx: discord.ApplicationContext):
-#     if ctx.guild.id in connections:  # Check if the guild is in the cache.
-#         vc = connections[ctx.guild.id]
-#         vc.stop_recording()  # Stop recording, and call the callback (once_done).
-#         # del connections[ctx.guild.id]  # Remove the guild from the cache.
-#         # await ctx.delete()  # And delete.
-#         await ctx.respond("Done")
-#     else:
-#         await ctx.respond("I am currently not recording here.")  # Respond with this if we aren't recording.
+            text = WHISPER_MODEL.transcribe(wav_path)["text"].strip()
+            os.unlink(wav_path)
+            user = await bot.fetch_user(uid)
+            lines.append(f"**{user.display_name}**: {text or '*…silence*'}")
 
-# async def save_files(files):
-#     saved_files = []
-#     for file in files:
-#         with open(file.filename, "wb") as f:
-#                 f.write(file.fp.read())
-#                 saved_files.append(file.filename)
-#     return saved_files
+        msg = "📝 **Transcript**\n" + ("\n".join(lines) if lines else "*No speech detected*")
+        await ctx.send(msg)
 
-# async def once_done(sink: discord.sinks, channel: discord.TextChannel, *args):  # Our voice client already passes these in.
-#     returned_transcription = {}
-#     saved_files = []
-#     recorded_users = [  # A list of recorded users
-#         f"<@{user_id}>"
-#         for user_id, audio in sink.audio_data.items()
-#     ]
-#     # await sink.vc.disconnect()  # Disconnect from the voice channel.
-    
-#     files = [discord.File(audio.file, f"{user_id}.{sink.encoding}") for user_id, audio in sink.audio_data.items()]  # List down the files.
-#     for file in files:
-#         with open(file.filename, "wb") as f:
-#             f.write(file.fp.read())
-#             saved_files.append(file.filename)
-#         # await save_files(files)
-#     returned_transcription = "tbone_transcriber.transcriber(saved_files)"
-#     # print(f"d_b.py: pre loop: {returned_transcription}")
-#     for transcription in returned_transcription:
-#         print(f"d_b.py: for t in r_t: {transcription=}")
+        await vc.disconnect(force=True)     # leave voice
 
-#         # For Twitch
-#         transcription["formatted_msg"] = f"twitch:{transcription["msg_user"]}: {transcription["msg_msg"]}"
-#         transcription["msg_server"] = "pdgeorge"
-#         to_send = transcription
+    vc.start_recording(sink, on_finish)
+    await asyncio.sleep(seconds)
+    vc.stop_recording()                     # triggers on_finish
 
-#         print(f"{to_send=}")
-#         # Need to add in a basic "convert user ID to name" function here.
-#         # Don't need to hard code the things, can make it load from file for Discord ID/Name Key/Value pairs.
-#         global_twitch_queue.put(json.dumps(to_send))
-        
-#     # Attempts to access transcription, even if nobody says anything.
-#     # Additionally, need to update this as a whole for when multiple people are talking or able to talk.
-#     # Potential option: Combine to one single message?
-#     await channel.send(f"Transcription for this message:\n\n{transcription["msg_msg"]}")  # Send a message with the transcription.
-
-# async def play(interaction: discord.Interaction, file_to_play: str = discord.Option(description="Enter the new time in seconds", min=1, max=999)):
-#     await interaction.response.send_message(f"You are currently in {interaction.user.voice.channel.name}")
-#     voice = interaction.user.voice
-#     if not voice:
-#         return await interaction.response.send_message("You aren't in a voice channel!")
-#     if not interaction.guild.voice_client:
-#         vc = await voice.channel.connect()  # Connect to the voice channel the author is in.
-#     else:
-#         vc = interaction.guild.voice_client
-#     connections.update({interaction.guild.id: vc})  # Updating the cache with the guild and channel.
-#     try:
-#         vc.stop()
-#         print("Before calling vc.play")
-#         vc.play(discord.FFmpegPCMAudio(file_to_play))
-#         print(f"Playing {file_to_play}")
-#         await interaction.guild.voice_client(file_to_play)
-#         await asyncio.sleep(1)
-#     except Exception as e:
-#         print(f"Somebody tell George Dabi's braincell asploded: {e}")
-
-def audio_length(file):
-    audio = AudioSegment.from_file(file)
-    duration_seconds = len(audio) / 1000
-
-    return duration_seconds
-
-def start_bot(twitch_queue, speaking_queue):
-    global global_twitch_queue
-    global global_speaking_queue
-    global_twitch_queue = twitch_queue
+# --------------------------------------------------------
+#  ENTRY‑POINT  (keeps your start_bot signature unchanged)
+# --------------------------------------------------------
+def start_bot(input_msg_queue, speaking_queue):
+    global global_input_msg_queue, global_speaking_queue
+    global_input_msg_queue = input_msg_queue
     global_speaking_queue = speaking_queue
     bot.run(DISCORD_TOKEN)
 
 if __name__ == "__main__":
-    # To run the bot quickly
+    # quick local test run
     import multiprocessing
-    twitch_queue = multiprocessing.Queue()
+    input_msg_queue = multiprocessing.Queue()
     speaking_queue = multiprocessing.Queue()
-    start_bot(twitch_queue, speaking_queue)
-
-    # For whatever we want to test.
-    # asyncio.run(test())
+    start_bot(input_msg_queue, speaking_queue)

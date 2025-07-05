@@ -10,7 +10,7 @@ from dabi_logging import dabi_print
 load_dotenv()
 
 followers = None
-global_twitch_queue = None
+global_input_msg_queue = None
 global_chat_mode = False
 tw = TW()
 
@@ -19,9 +19,9 @@ CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')   # The channel ID of the channel 
 CLIENT_ID = os.getenv('DABI_CLIENT_ID')         # The same Client ID used to generate the access token
 
 async def handle_twitch_msg(event):
-    global global_twitch_queue
+    global global_input_msg_queue
     to_send = await extract_message_to_send_chat(event)
-    global_twitch_queue.put(json.dumps(to_send))
+    global_input_msg_queue.put(json.dumps(to_send))
 
 async def extract_message_to_send_chat(event):
     formatted_msg = None
@@ -42,10 +42,10 @@ async def extract_message_to_send_chat(event):
     return formatted_return
 
 async def handle_sub(event):
-    global global_twitch_queue
+    global global_input_msg_queue
 
     to_send = await extract_message_to_sub(event)
-    global_twitch_queue.put(json.dumps(to_send))
+    global_input_msg_queue.put(json.dumps(to_send))
 
 async def extract_message_to_sub(event):
     formatted_msg = None
@@ -66,13 +66,13 @@ async def extract_message_to_sub(event):
     return formatted_return
 
 async def handle_redemptions(event):
-    global global_twitch_queue
+    global global_input_msg_queue
     event_title = event.get('payload', {}).get('event', {}).get('reward', {}).get('title', {})
     match event_title:
         case "Ask Dabi A Q":
             to_send = await extract_message_to_send_points(event)
             dabi_print(f"{to_send=}")
-            global_twitch_queue.put(json.dumps(to_send))
+            global_input_msg_queue.put(json.dumps(to_send))
         case "timeout":
             formatted_received = await extract_message_to_send_points(event)
             dabi_print(f"{formatted_received=}")
@@ -110,7 +110,7 @@ async def extract_message_to_send_points(event):
 
 async def on_message(ws, message):
     global followers
-    global global_twitch_queue
+    global global_input_msg_queue
     global global_chat_mode
     event = json.loads(message)
     if event['metadata']['message_type'] == 'session_welcome':
@@ -189,7 +189,7 @@ async def on_message(ws, message):
                 "msg_msg": "Has just followed!",
                 "formatted_msg": f"twitch:{event.get('payload', {}).get('event', {}).get('user_login', {})}: Has just followed!"
             }
-            global_twitch_queue.put(json.dumps(follow_to_send))
+            global_input_msg_queue.put(json.dumps(follow_to_send))
             dabi_print(json.dumps(follow_to_send))
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.channel_points_custom_reward_redemption.add':
         dabi_print(event)
@@ -253,10 +253,10 @@ async def main():
 
     await asyncio.gather(ws_conn())
 
-def start_events(twitch_queue, chat_mode, dabi_print):
-    global global_twitch_queue
+def start_events(input_msg_queue, chat_mode, dabi_print):
+    global global_input_msg_queue
     global global_chat_mode
-    global_twitch_queue = twitch_queue
+    global_input_msg_queue = input_msg_queue
     global_chat_mode = chat_mode
     dabi_print("TwitchEvent process has started")
     tw.update_key()
@@ -265,10 +265,10 @@ def start_events(twitch_queue, chat_mode, dabi_print):
 
 async def test_main():
     import multiprocessing
-    global global_twitch_queue
+    global global_input_msg_queue
     global global_chat_mode
     global_chat_mode = False
-    global_twitch_queue = multiprocessing.Queue()
+    global_input_msg_queue = multiprocessing.Queue()
     dabi_print("Running the test version")
     validate_response = tw.validate()
     dabi_print(validate_response)
