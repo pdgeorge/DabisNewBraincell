@@ -65,6 +65,50 @@ async def extract_message_to_sub(event):
     
     return formatted_return
 
+# Can do more with bits than just "Here is the message that came with the bits". This is just the start
+async def handle_bits(event):
+    formatted_msg = None
+    formatted_return = None
+
+    # bits_spent = event.get('payload', {}).get('event', {}).get('bits', {}) # Don't want to add this in yet
+    # bits_type = event.get('payload', {}).get('event', {}).get('type', {}) # Not needed yet? "cheer", "power_up", "combo"
+    # cheer = message in chat
+    # power_up = "BIG EMOTE" etc.
+    # combo = click the heart
+
+    msg_username = event.get('payload', {}).get('event', {}).get('user_login', {})
+    msg_msg = event.get('payload', {}).get('event', {}).get('message', {}).get('text', {})
+    msg_server = event.get('payload', {}).get('event', {}).get('broadcaster_user_login', {})
+    formatted_msg = f"twitch:{msg_username}: {msg_msg}"
+
+    formatted_return = {
+                "msg_user": msg_username,
+                "msg_server": msg_server,
+                "msg_msg": msg_msg,
+                "formatted_msg": formatted_msg
+            }
+    
+    global_input_msg_queue.put(json.dumps(formatted_return))
+
+async def handle_raid(event):
+    formatted_msg = None
+    formatted_return = None
+
+    # raided_viewers = event.get('payload', {}).get('event', {}).get('viewers', {}) # NOT NEEDED
+    msg_username = event.get('payload', {}).get('event', {}).get('from_broadcaster_user_login', {})
+    msg_msg = f"{msg_username} has just raided us! Show them some love! Give them an introduction in to who you are, tell them what we have been doing!"
+    msg_server = event.get('payload', {}).get('event', {}).get('broadcaster_user_login', {})
+    formatted_msg = f"twitch:{msg_username}: {msg_msg}"
+
+    formatted_return = {
+                "msg_user": msg_username,
+                "msg_server": msg_server,
+                "msg_msg": msg_msg,
+                "formatted_msg": formatted_msg
+            }
+    
+    global_input_msg_queue.put(json.dumps(formatted_return))
+
 async def handle_redemptions(event):
     global global_input_msg_queue
     event_title = event.get('payload', {}).get('event', {}).get('reward', {}).get('title', {})
@@ -148,6 +192,26 @@ async def on_message(ws, message):
                     'method': 'websocket',
                     'session_id': f'{session_id}',
                 }
+            },{
+                'type': 'channel.bits.use',
+                'version': '1',
+                'condition': {
+                    "broadcaster_user_id": CHANNEL_ID
+                },
+                'transport': {
+                    'method': 'websocket',
+                    'session_id': f'{session_id}',
+                }
+            },{
+                'type': 'channel.raid',
+                'version': '1',
+                'condition': {
+                    "from_broadcaster_user_id": CHANNEL_ID
+                },
+                'transport': {
+                    'method': 'websocket',
+                    'session_id': f'{session_id}',
+                }
             }
         ]
         if global_chat_mode == True:
@@ -199,6 +263,10 @@ async def on_message(ws, message):
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.subscribe':
         dabi_print(event)
         await handle_sub(event)
+    elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.bits.use':
+        await handle_bits(event)
+    elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.raid':
+        await handle_raid(event)
     else:
         dabi_print(event)
 

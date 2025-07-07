@@ -1,8 +1,8 @@
 import os
 import asyncio
 import tempfile
-
-import discord                 # Pycord 2.5+, `py-cord[voice]`
+import discord # Pycord 2.5+, `py-cord[voice]`
+from discord.ext import commands, tasks
 import whisper
 from pydub import AudioSegment
 from dotenv import load_dotenv
@@ -11,8 +11,9 @@ from dabi_logging import dabi_print
 load_dotenv()
 DISCORD_TOKEN = os.getenv("CYRA_DISCORD")
 
-WHISPER_MODEL = whisper.load_model("base") 
+WHISPER_MODEL = whisper.load_model("base")
 DEFAULT_RECORD = 10
+PRIVILEGED_ROLES = {"TheGuyInChargeIGuess", "Cyra-chatter"}
 
 # ----------  Discord client  ---------------
 intents = discord.Intents.all()
@@ -22,28 +23,99 @@ intents.voice_states = True
 bot = discord.Bot(intents=intents)
 
 # Helpers -------------------------------------------------
+
 def audio_length(path: str) -> float:
     """Return duration of an audio file (seconds) with pydub."""
     return len(AudioSegment.from_file(path)) / 1000.0
 
+async def do_transcribe(ctx: discord.ApplicationContext,
+                        seconds: int):
+    if not ctx.author.voice:
+        return await ctx.respond("❌ You must be in a voice channel.", ephemeral=True)
+
+    voice_channel = ctx.author.voice.channel
+    # await ctx.respond(f"🎙️ Recording for **{seconds} s** …")
+
+    # Connect or move to author’s channel
+    vc: discord.VoiceClient
+    if ctx.guild.voice_client:
+        vc = ctx.guild.voice_client
+        if vc.channel != voice_channel:
+            await vc.move_to(voice_channel)
+    else:
+        vc = await voice_channel.connect()
+
+    sink = discord.sinks.WaveSink()
+
+    async def on_finish(sink: discord.sinks.Sink, *args):
+        lines = []
+        msg_usernames = []
+        msg_msgs = []
+        msg_server = 1337
+        formatted_msgs = []
+        for uid, audio in sink.audio_data.items():
+            # Save to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                audio.file.seek(0)
+                tmp.write(audio.file.read())
+                wav_path = tmp.name
+
+            text = WHISPER_MODEL.transcribe(wav_path)["text"].strip()
+            os.unlink(wav_path)
+            user = await bot.fetch_user(uid)
+            msg_usernames.append(user.display_name)
+            msg_msgs.append(text or "...silence")
+            formatted_msgs.append(f"{user.display_name}: {text or '...silence'}")
+            lines.append(f"{user.display_name}: {text or '…silence'}")
+
+        formatted_msg = (" ".join(formatted_msgs) if formatted_msgs else "*No speech detected*")
+        formatted_return = {
+                "msg_user": (" ".join(msg_usernames) if msg_usernames else "*No speech detected*"),
+                "msg_server": msg_server,
+                "msg_msg": (" ".join(msg_msgs) if msg_msgs else "*No speech detected*"),
+                "formatted_msg": formatted_msg
+            }
+        print(formatted_return)
+        global_input_msg_queue.put(formatted_return)
+
+    vc.start_recording(sink, on_finish)
+    await asyncio.sleep(seconds)
+    vc.stop_recording()                     # triggers on_finish
+
 connections = {}
 global_input_msg_queue = None
 global_speaking_queue = None
-global_communicating = False
+listening_flag = False
 
-# --------------------------------------------------------
-#  EVENTS
-# --------------------------------------------------------
+@tasks.loop(seconds=60)
+async def voice_keepalive():
+    for vc in bot.voice_clients:
+        if vc.is_connected():
+            vc.send_audio_packet(b'\xF8\xFF\xFE', encode=False)
+
 @bot.event
 async def on_ready():
     dabi_print(f"{bot.user} is ready and online!")
     await bot.sync_commands()
     dabi_print("Slash commands synced.")
+    # voice_keepalive.start()
 
-# --------------------------------------------------------
-#  SIMPLE COMMANDS
-# --------------------------------------------------------
+@bot.event
+async def on_message(message: discord.message):
+    if message.author.bot:
+        return
+
+    if message.channel.name == "dabi-talks":
+        await message.channel.send("hello")
+
+# @tasks.loop(seconds=60)
+# async def voice_keepalive():
+#     for vc in bot.voice_clients:
+#         if vc.is_connected():
+#             vc.send_audio_packet(b'\xF8\xFF\xFE', encode=False)
+
 @bot.slash_command(name="hello", description="Say hello to the bot!")
+@commands.has_any_role(*PRIVILEGED_ROLES)
 async def hello(ctx: discord.ApplicationContext):
     await ctx.respond("Hello, world!")
 
@@ -65,12 +137,11 @@ async def test(ctx: discord.ApplicationContext):
         return
     vc = ctx.guild.voice_client or await voice.channel.connect()
     connections[ctx.guild.id] = vc
-
-# --------------------------------------------------------
-#  LISTEN command – plays audio files from speaking_queue
-# --------------------------------------------------------
+    
 @bot.slash_command(name="listen", description="Play back items from the speaking queue")
+@commands.has_any_role(*PRIVILEGED_ROLES)
 async def listen(ctx: discord.ApplicationContext):
+    global listening_flag
     voice = ctx.author.voice
     if not voice:
         return await ctx.respond("You aren't in a voice channel!")
@@ -87,67 +158,56 @@ async def listen(ctx: discord.ApplicationContext):
                 continue
 
             if global_speaking_queue and global_speaking_queue.qsize() > 0:
+                temp_flag = listening_flag
+                if listening_flag:
+                    listening_flag = False
                 to_play = global_speaking_queue.get()
                 vc.stop()
                 vc.play(discord.FFmpegPCMAudio(to_play))
                 delay = audio_length(to_play) + 0.5
                 dabi_print(f"Playing {to_play} ({delay:.1f}s)")
                 await asyncio.sleep(delay)
+                if temp_flag:
+                    listening_flag = temp_flag
+                temp_flag = False
                 try:
                     os.remove(to_play)
                 except OSError:
                     pass
+            if listening_flag:
+                await do_transcribe(ctx=ctx, seconds=DEFAULT_RECORD)
+                await asyncio.sleep(0.1)
             await asyncio.sleep(0.1)
     except Exception as e:
         dabi_print(f"Error in listen loop: {e}")
 
-# --------------------------------------------------------
-#  /TRANSCRIBE  – join, record N seconds, Whisper transcribe
-# --------------------------------------------------------
 @bot.slash_command(name="transcribe", description="Record and transcribe this voice channel")
+@commands.has_any_role(*PRIVILEGED_ROLES)
 async def transcribe(
     ctx: discord.ApplicationContext,
     seconds: discord.Option(int, "Seconds to record (1‑120)", default=DEFAULT_RECORD, min_value=1, max_value=120) # type: ignore
 ):
-    if not ctx.author.voice:
-        return await ctx.respond("❌ You must be in a voice channel.", ephemeral=True)
+    await do_transcribe(ctx=ctx, seconds=seconds)
 
-    voice_channel = ctx.author.voice.channel
-    await ctx.respond(f"🎙️ Recording for **{seconds} s** …")
+@bot.slash_command(name="start_listening", description="Start listening")
+@commands.has_any_role(*PRIVILEGED_ROLES)
+async def start_listening(ctx: discord.ApplicationContext):
+    global listening_flag
+    listening_flag = True
+    await ctx.respond("Will now listen and transcribe")
 
-    # Connect or move to author’s channel
-    vc: discord.VoiceClient
-    if ctx.guild.voice_client:
-        vc = ctx.guild.voice_client
-        if vc.channel != voice_channel:
-            await vc.move_to(voice_channel)
-    else:
-        vc = await voice_channel.connect()
+@bot.slash_command(name="stop_listening", description="Stop listening")
+@commands.has_any_role(*PRIVILEGED_ROLES)
+async def stop_listening(ctx: discord.ApplicationContext):
+    global listening_flag
+    listening_flag = False
+    await ctx.respond("Will now stop listening and transcribing")
 
-    sink = discord.sinks.WaveSink()        # separate WAV per speaker
-
-    async def on_finish(sink: discord.sinks.Sink, *args):
-        lines = []
-        for uid, audio in sink.audio_data.items():
-            # Save to temp file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                audio.file.seek(0)
-                tmp.write(audio.file.read())
-                wav_path = tmp.name
-
-            text = WHISPER_MODEL.transcribe(wav_path)["text"].strip()
-            os.unlink(wav_path)
-            user = await bot.fetch_user(uid)
-            lines.append(f"**{user.display_name}**: {text or '*…silence*'}")
-
-        msg = "📝 **Transcript**\n" + ("\n".join(lines) if lines else "*No speech detected*")
-        await ctx.send(msg)
-
-        await vc.disconnect(force=True)     # leave voice
-
-    vc.start_recording(sink, on_finish)
-    await asyncio.sleep(seconds)
-    vc.stop_recording()                     # triggers on_finish
+@bot.slash_command(name="test_listening", description="Stop listening")
+@commands.has_any_role(*PRIVILEGED_ROLES)
+async def test_listening(ctx: discord.ApplicationContext):
+    global listening_flag
+    await ctx.respond(f"listening_flag is {listening_flag}")
 
 # --------------------------------------------------------
 #  ENTRY‑POINT  (keeps your start_bot signature unchanged)

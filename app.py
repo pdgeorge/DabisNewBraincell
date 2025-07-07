@@ -106,7 +106,7 @@ async def speak_message(message, dabi):
     
     response = await dabi.send_msg(send_to_dabi)
     dabi_print(f"{response=}")
-    if message["msg_server"].isdigit() != True:
+    if str(message.get("msg_server", "")).isdigit() != True:
         await db_insert(table_name=message["msg_server"], username=message["msg_user"], message=message["msg_msg"], response=response)
     
     voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)
