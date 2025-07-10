@@ -87,22 +87,29 @@ async def reset(dabi):
 async def choose_action(msg, dabi):
     dabi_print(msg)
     if 'reset' in msg:
+        print("==================================resetting======================")
         return await reset(dabi)
+    if 'load_personality' in msg:
+        print("Load personalidy found?!?!?!?!?")
+        return msg
 
 # Takes in the message received from twitch_connector
 # Removes "twitch:" and "speaks" the message
 async def speak_message(message, dabi):
     to_send = None
-    #
+    
     twitch_prefix = "twitch:"
     game_prefix = "game:"
     action_prefix = "action:"
+    website_prefix = "website:"
     if message["formatted_msg"].startswith(twitch_prefix):
         send_to_dabi = message["formatted_msg"][len(twitch_prefix):]
     if message["formatted_msg"].startswith(game_prefix):
         send_to_dabi = message["formatted_msg"][len(game_prefix):]
+    if message["formatted_msg"].startswith(website_prefix):
+        send_to_dabi = message["formatted_msg"][len(website_prefix):]
     if message["formatted_msg"].startswith(action_prefix):
-        send_to_dabi = await choose_action(message["formatted_msg"][len(twitch_prefix):], dabi)
+        send_to_dabi = await choose_action(message["formatted_msg"][len(action_prefix):], dabi)
     
     response = await dabi.send_msg(send_to_dabi)
     dabi_print(f"{response=}")
