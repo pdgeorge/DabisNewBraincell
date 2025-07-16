@@ -102,12 +102,15 @@ async def speak_message(message, dabi):
     game_prefix = "game:"
     action_prefix = "action:"
     website_prefix = "website:"
+    discord_prefix = "discord:"
     if message["formatted_msg"].startswith(twitch_prefix):
         send_to_dabi = message["formatted_msg"][len(twitch_prefix):]
     if message["formatted_msg"].startswith(game_prefix):
         send_to_dabi = message["formatted_msg"][len(game_prefix):]
     if message["formatted_msg"].startswith(website_prefix):
         send_to_dabi = message["formatted_msg"][len(website_prefix):]
+    if message["formatted_msg"].startswith(discord_prefix):
+        send_to_dabi = message["formatted_msg"][len(discord_prefix):]
     if message["formatted_msg"].startswith(action_prefix):
         send_to_dabi = await choose_action(message["formatted_msg"][len(action_prefix):], dabi)
     
