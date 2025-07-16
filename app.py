@@ -87,10 +87,13 @@ async def reset(dabi):
 async def choose_action(msg, dabi):
     dabi_print(msg)
     if 'reset' in msg:
-        print("==================================resetting======================")
+        print("===resetting===")
         return await reset(dabi)
     if 'load_personality' in msg:
-        print("Load personalidy found?!?!?!?!?")
+        print("!!!Load personalidy found!!!")
+        # TODO Add in "Load Personality" here. 
+        # personality_to_load = msg.personality_to_load (or whatever I do)
+        # load_new_personality(dabi, personality_to_load)
         return msg
 
 # Takes in the message received from twitch_connector
