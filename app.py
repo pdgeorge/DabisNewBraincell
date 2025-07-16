@@ -93,14 +93,17 @@ async def choose_action(msg, dabi):
 # Removes "twitch:" and "speaks" the message
 async def speak_message(message, dabi):
     to_send = None
-    #
+    
     twitch_prefix = "twitch:"
     game_prefix = "game:"
     action_prefix = "action:"
+    discord_prefix = "discord:"
     if message["formatted_msg"].startswith(twitch_prefix):
         send_to_dabi = message["formatted_msg"][len(twitch_prefix):]
     if message["formatted_msg"].startswith(game_prefix):
         send_to_dabi = message["formatted_msg"][len(game_prefix):]
+    if message["formatted_msg"].startswith(discord_prefix):
+        send_to_dabi = message["formatted_msg"][len(discord_prefix):]
     if message["formatted_msg"].startswith(action_prefix):
         send_to_dabi = await choose_action(message["formatted_msg"][len(twitch_prefix):], dabi)
     

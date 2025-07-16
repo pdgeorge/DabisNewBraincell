@@ -1,19 +1,27 @@
 import os
 import asyncio
 import tempfile
+import json
 import discord # Pycord 2.5+, `py-cord[voice]`
 from discord.ext import commands, tasks
 import whisper
+from pathlib import Path
 from pydub import AudioSegment
 from dotenv import load_dotenv
 from dabi_logging import dabi_print
 
+import whisper, torch
+torch.set_num_threads(1)                     # don’t oversubscribe OpenMP
+_MODEL = whisper.load_model("base", device="cpu")          # loads only in this process
+
+# --------- globals & constants ------------
 load_dotenv()
 DISCORD_TOKEN = os.getenv("CYRA_DISCORD")
 
-WHISPER_MODEL = whisper.load_model("base")
 DEFAULT_RECORD = 10
 PRIVILEGED_ROLES = {"TheGuyInChargeIGuess", "Cyra-chatter"}
+
+TMP_DIR = Path("./tmp"); TMP_DIR.mkdir(exist_ok=True)
 
 # ----------  Discord client  ---------------
 intents = discord.Intents.all()
@@ -27,6 +35,17 @@ bot = discord.Bot(intents=intents)
 def audio_length(path: str) -> float:
     """Return duration of an audio file (seconds) with pydub."""
     return len(AudioSegment.from_file(path)) / 1000.0
+
+def _transcribe_sync(path: Path) -> str:
+    return _MODEL.transcribe(str(path))["text"].strip()
+
+async def transcribe_async(path: Path, timeout: int = 120) -> str:
+    """Public helper you can reuse anywhere in this module."""
+    loop = asyncio.get_running_loop()
+    return await asyncio.wait_for(
+        loop.run_in_executor(None, _transcribe_sync, path),
+        timeout=timeout
+    )
 
 async def do_transcribe(ctx: discord.ApplicationContext,
                         seconds: int):
@@ -60,7 +79,7 @@ async def do_transcribe(ctx: discord.ApplicationContext,
                 tmp.write(audio.file.read())
                 wav_path = tmp.name
 
-            text = WHISPER_MODEL.transcribe(wav_path)["text"].strip()
+            text = (await transcribe_async(wav_path)).strip()
             os.unlink(wav_path)
             user = await bot.fetch_user(uid)
             msg_usernames.append(user.display_name)
@@ -68,15 +87,15 @@ async def do_transcribe(ctx: discord.ApplicationContext,
             formatted_msgs.append(f"{user.display_name}: {text or '...silence'}")
             lines.append(f"{user.display_name}: {text or '…silence'}")
 
-        formatted_msg = (" ".join(formatted_msgs) if formatted_msgs else "*No speech detected*")
+        formatted_msg = f'discord:{(" ".join(formatted_msgs) if formatted_msgs else "*No speech detected*")}'
         formatted_return = {
                 "msg_user": (" ".join(msg_usernames) if msg_usernames else "*No speech detected*"),
                 "msg_server": msg_server,
                 "msg_msg": (" ".join(msg_msgs) if msg_msgs else "*No speech detected*"),
                 "formatted_msg": formatted_msg
             }
-        print(formatted_return)
-        global_input_msg_queue.put(formatted_return)
+        print(json.dumps(formatted_return))
+        global_input_msg_queue.put(json.dumps(formatted_return))
 
     vc.start_recording(sink, on_finish)
     await asyncio.sleep(seconds)
@@ -175,6 +194,7 @@ async def listen(ctx: discord.ApplicationContext):
                 except OSError:
                     pass
             if listening_flag:
+                print(f"{listening_flag=}")
                 await do_transcribe(ctx=ctx, seconds=DEFAULT_RECORD)
                 await asyncio.sleep(0.1)
             await asyncio.sleep(0.1)
@@ -187,6 +207,7 @@ async def transcribe(
     ctx: discord.ApplicationContext,
     seconds: discord.Option(int, "Seconds to record (1‑120)", default=DEFAULT_RECORD, min_value=1, max_value=120) # type: ignore
 ):
+    await ctx.respond("One shot transcribe starting!")
     await do_transcribe(ctx=ctx, seconds=seconds)
 
 @bot.slash_command(name="start_listening", description="Start listening")
