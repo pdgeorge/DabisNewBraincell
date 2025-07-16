@@ -24,6 +24,15 @@ def format_string_action(msg_msg) -> str:
     }
     return formatted_return
 
+def format_string_website(msg_msg) -> str:
+    formatted_return = {
+        "msg_user": "Dabi",
+        "msg_server": "Pdgeorge",
+        "msg_msg": msg_msg,
+        "formatted_msg": f"website:Dabi: {msg_msg}"
+    }
+    return formatted_return
+
 def start_receiving(
         event_queue: multiprocessing.Queue,
         *,
@@ -77,6 +86,10 @@ def start_receiving(
                 event_queue.put(json.dumps(to_send))
             if payload.get('action', None):
                 to_send = format_string_action(payload.get('action', None))
+                print(json.dumps(to_send))
+                event_queue.put(json.dumps(to_send))
+            if payload.get('website', None):
+                to_send = format_string_website(payload.get('website', None))
                 print(json.dumps(to_send))
                 event_queue.put(json.dumps(to_send))
         except Exception as exc:
