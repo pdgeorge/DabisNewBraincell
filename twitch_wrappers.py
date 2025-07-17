@@ -69,6 +69,7 @@ class TW():
     def validate(self):
         load_dotenv(override=True)
         ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN')
+        self.access_token = ACCESS_TOKEN
         url = 'https://id.twitch.tv/oauth2/validate'
 
         headers = {
