@@ -1,0 +1,38 @@
+body 
+{
+    margin: 0;
+}
+
+.dabi{
+    position: fixed;
+    bottom: 0;
+    right: 0;
+
+    width: 400px;
+    height: 400px;
+    object-fit: contain;
+
+    pointer-events: none;
+    z-index: 2000;
+}
+
+.caption{
+    position:fixed;
+    bottom:5%;
+    left:50%;
+    transform:translateX(-50%);
+
+    max-width:20ch;
+    width:100%;
+    text-align:center;
+
+    font:900 48px/1.2 "Arial Black",sans-serif;
+    color:#fff;
+    text-shadow:2px 2px 8px rgba(0,0,0,.85);
+
+    white-space:pre-wrap;
+    overflow:hidden;
+    max-height:calc(1.2em * 8);
+    pointer-events:none;
+    z-index:1000;
+}

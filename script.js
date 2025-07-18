@@ -3,9 +3,24 @@ console.log("Just to prove script is working")
 // {type: "updateMouth", size: 1, message: "string"} // Open
 // {type: "updateMouth", size: 0, message: "string"} // Closed
 
+const captionBox = document.getElementById('dabi-caption');
+
 var url = 'ws://localhost:8001/api'
 
 let ws
+let captionTimerId = null;
+
+function showCaption(text, duration=30_000){
+    captionBox.textContent = text;
+    if(captionTimerId){
+        clearTimeout(captionTimerId)
+    }
+
+    captionTimerId = setTimeout(() => {
+        captionBox.textContent = "";
+        captionTimerId = null;
+    }, duration);
+}
 
 function showMessage(message) {
     window.setTimeout(() => window.alert(message), 50);
@@ -42,6 +57,9 @@ function connect(){
         switch (data.type) {
             case 'updateMouth':
                 // setFrame(data.size);
+                console.log(data);
+                console.log(data.message);
+                showCaption(data.message);
                 iterateArrayWithDelay(data.pattern);
                 break;
             default:
