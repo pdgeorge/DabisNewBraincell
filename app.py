@@ -5,15 +5,14 @@
 
 import asyncio
 import json
-from websocket import create_connection
+# from websocket import create_connection
 import websockets
-from websockets.sync.client import connect
+# from websockets.sync.client import connect
 import sqlite3
 import numpy as np
 from pydub import AudioSegment
 from dabi_logging import dabi_print
 
-import random
 import traceback
 
 from bot_openai import OpenAI_Bot
@@ -31,6 +30,9 @@ CABLE_A_OUTPUT = 26 # This was found using dabi.scan_audio_devices()
 
 global_speaking_queue = None
 global_game_queue = None
+read_message_flag = False
+last_msg_time = None
+chat_messages = []
 
 async def db_insert(table_name, username, message, response):
     # Connect to the db. If it doesn't exist it will be created.
@@ -106,6 +108,7 @@ async def speak_message(message, dabi):
     action_prefix = "action:"
     website_prefix = "website:"
     discord_prefix = "discord:"
+    message_prefix = "message:"
     if message["formatted_msg"].startswith(twitch_prefix):
         send_to_dabi = message["formatted_msg"][len(twitch_prefix):]
     if message["formatted_msg"].startswith(game_prefix):
@@ -116,11 +119,11 @@ async def speak_message(message, dabi):
         send_to_dabi = message["formatted_msg"][len(discord_prefix):]
     if message["formatted_msg"].startswith(action_prefix):
         send_to_dabi = await choose_action(message["formatted_msg"][len(action_prefix):], dabi)
+    if message["formatted_msg"].startswith(message_prefix) and read_message_flag:
+        send_to_dabi = message["formatted_msg"][len(message_prefix):]
     
     response = await dabi.send_msg(send_to_dabi)
     dabi_print(f"{response=}")
-    if str(message.get("msg_server", "")).isdigit() != True:
-        await db_insert(table_name=message["msg_server"], username=message["msg_user"], message=message["msg_msg"], response=response)
     
     voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)
     
