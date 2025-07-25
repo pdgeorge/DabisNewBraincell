@@ -50,7 +50,7 @@ async def main():
 
         ### INGESTORS ###
         # Takes in events from Twitch and sends to input_msg_queue
-        event_process = multiprocessing.Process(target=twitch_event.start_events, args=(input_msg_queue, listen_to_chat,dabi_print,))
+        event_process = multiprocessing.Process(target=twitch_event.start_events, args=(input_msg_queue, dabi_print, listen_to_chat,))
         processes.append(event_process)
 
         # takes in from speaking_queue and speaks through discord

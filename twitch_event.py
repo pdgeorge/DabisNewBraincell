@@ -6,6 +6,7 @@ import websockets
 from twitch_wrappers import TW
 from dotenv import load_dotenv
 from dabi_logging import dabi_print
+from datetime import datetime
 
 load_dotenv()
 
@@ -13,15 +14,51 @@ followers = None
 global_input_msg_queue = None
 global_chat_mode = False
 tw = TW()
+first_now = datetime.now()
+first_unix_timestamp_float = first_now.timestamp()
+last_msg_time = int(first_unix_timestamp_float)
+chat_messages = []
 
 # ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN')   # Generated from your authentication mechanism, make sure it is scoped properly
 CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')   # The channel ID of the channel you want to join
 CLIENT_ID = os.getenv('DABI_CLIENT_ID')         # The same Client ID used to generate the access token
 
+async def collect_messages(message):
+    if message.get("msg_msg", "")[0] == "!":
+        return None
+    global last_msg_time
+    global chat_messages
+    now = datetime.now()
+    unix_timestamp_float = now.timestamp()
+    this_msg_time = int(unix_timestamp_float)
+    chat_messages.append(message)
+    if (len(chat_messages) >= 10) or ((this_msg_time - last_msg_time) > 10):
+        msg_usernames   = []
+        formatted_msgs  = []
+        msg_msgs        = []
+        for cm in chat_messages:
+            msg_usernames.append(cm.get("msg_user", ""))
+            formatted_msgs.append(cm.get("formatted_msg", ""))
+            msg_msgs.append(cm.get("msg_msg", ""))
+        formatted_return = {
+            "msg_user": (" ".join(msg_usernames) if msg_usernames else ""),
+            "msg_server": "pdgeorge",
+            "msg_msg": (" ".join(msg_msgs) if msg_msgs else ""),
+            "formatted_msg": (" ".join(formatted_msgs) if formatted_msgs else "")
+        }
+        now = datetime.now()
+        unix_timestamp_float = now.timestamp()
+        last_msg_time = int(unix_timestamp_float)
+        return formatted_return
+    else:
+        return None
+
 async def handle_twitch_msg(event):
     global global_input_msg_queue
     to_send = await extract_message_to_send_chat(event)
-    global_input_msg_queue.put(json.dumps(to_send))
+    to_send = await collect_messages(to_send)
+    if to_send is not None:
+        global_input_msg_queue.put(json.dumps(to_send))
 
 async def extract_message_to_send_chat(event):
     formatted_msg = None
@@ -111,6 +148,7 @@ async def handle_raid(event):
 
 async def handle_redemptions(event):
     global global_input_msg_queue
+    global global_chat_mode
     event_title = event.get('payload', {}).get('event', {}).get('reward', {}).get('title', {})
     match event_title:
         case "Ask Dabi A Q":
@@ -121,6 +159,15 @@ async def handle_redemptions(event):
             formatted_received = await extract_message_to_send_points(event)
             dabi_print(f"{formatted_received=}")
             response = await timeout_user(formatted_received)
+        case "brb":
+            global_chat_mode = True
+            brb_msg = {
+                "msg_user": "pdgeorge",
+                "msg_server": "pdgeorge",
+                "msg_msg": "Can you look after chat while I'm away? Thanks bro.",
+                "formatted_msg": "twitch:pdgeorge: Can you look after chat while I'm away? Thanks bro."
+            }
+            global_input_msg_queue.put(json.dumps(brb_msg))
 
 async def timeout_user(msg):
     formatted_return = None
@@ -212,10 +259,7 @@ async def on_message(ws, message):
                     'method': 'websocket',
                     'session_id': f'{session_id}',
                 }
-            }
-        ]
-        if global_chat_mode == True:
-            subscribe_array.append({
+            },{
                 'type': 'channel.chat.message',
                 'version': '1',
                 'condition': {
@@ -226,7 +270,8 @@ async def on_message(ws, message):
                     'method': 'websocket',
                     'session_id': f'{session_id}',
                 }
-            })
+            }
+        ]
         for subscribe in subscribe_array:
             dabi_print(subscribe)
             response = requests.post(
@@ -259,13 +304,16 @@ async def on_message(ws, message):
         dabi_print(event)
         await handle_redemptions(event)
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.chat.message' and event.get('payload', {}).get('event', {}).get('channel_points_custom_reward_id', {}) == None:
-        await handle_twitch_msg(event)
+        if global_chat_mode:
+            await handle_twitch_msg(event)
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.subscribe':
         dabi_print(event)
         await handle_sub(event)
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.bits.use':
+        dabi_print(event)
         await handle_bits(event)
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.raid':
+        dabi_print(event)
         await handle_raid(event)
     else:
         dabi_print(event)
@@ -321,11 +369,11 @@ async def main():
 
     await asyncio.gather(ws_conn())
 
-def start_events(input_msg_queue, chat_mode, dabi_print):
+def start_events(input_msg_queue, dabi_print, chat_mode):
     global global_input_msg_queue
     global global_chat_mode
-    global_input_msg_queue = input_msg_queue
     global_chat_mode = chat_mode
+    global_input_msg_queue = input_msg_queue
     dabi_print("TwitchEvent process has started")
     tw.update_key()
     tw.validate()

@@ -83,6 +83,7 @@ def print_error(e, response=None):
     dabi_print("============ There was an error! ============")
     dabi_print(f"Exception type: {type(e).__name__}")  # Log exception type
     dabi_print(f"Exception message: {str(e)}")
+    dabi_print(f"{repr(e)=}")
     if response is not None:
         dabi_print("Full response:", response)
         dabi_print(f"{response=}")
@@ -106,7 +107,7 @@ async def play_breakout(val: int):
     answer = await breakout_play.connect_temp(val)
     return answer
 
-async def timeout_user(callers_name: str, user_name: str, length: int):
+async def timeout_user(callers_name: str, user_name: str, length: int = 10):
     response = "timeout_user_is_not_ready_yet"
     russian_roulette = random.randint(0,99)
     dabi_print(f"{callers_name=}, {user_name=}, {length=}, {russian_roulette=}")
@@ -117,10 +118,12 @@ async def timeout_user(callers_name: str, user_name: str, length: int):
     if (russian_roulette < 95 or exists) and callers_name.upper() != 'PDGEORGE':
         user_name = callers_name
 
+    print(f"timeout_user, {russian_roulette=}, ")
     if type(length) is int:
         if length == 0 or length > 100 or length < 0:
             length = 10
         response = tw.timeout_user(user_name, length)
+        print(f"125:============{response=}============")
         error = response.get('error', None)
         dabi_print(f"{response=}, {error=}")
         if error is not None:
@@ -137,6 +140,7 @@ async def timeout_user(callers_name: str, user_name: str, length: int):
             if length == 0 or length > 100 or length < 0:
                 length = 10
             response = tw.timeout_user(user_name, length)
+            print(f"142:============{response=}============")
             error = response.get('error', None)
             dabi_print(f"{response=}, {error=}")
             if error is not None:
@@ -231,46 +235,50 @@ class OpenAI_Bot():
 
             response_message = response.choices[0].message
             tool_calls = response_message.tool_calls
-
-            if tool_calls:
-                self.chat_history.append({
-                    "role": "assistant",
-                    "content": response_message.content,
-                    "tool_calls": [
-                        {
-                            "id": tc.id,
-                            "function": {
-                                "name": tc.function.name,
-                                "arguments": tc.function.arguments
-                            },
-                            "type": "function"
-                        }
-                        for tc in tool_calls
-                    ]
-                })
-                
-                print("===============================================")
-                dabi_print(f"Tool call: {self.chat_history[-1]=}")
-                print("===============================================")
-
-                for tool_call in tool_calls:
-                    args = json.loads(tool_call.function.arguments)
-
-                    result = await globals()[tool_call.function.name](**args)
-
+            try:
+                if tool_calls:
                     self.chat_history.append({
-                        "role": "tool",
-                        "content": json.dumps(result),
-                        "tool_call_id": tool_call.id
+                        "role": "assistant",
+                        "content": response_message.content,
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                },
+                                "type": "function"
+                            }
+                            for tc in tool_calls
+                        ]
                     })
-                final_response = await client.chat.completions.create(
-                    model="deepseek-chat",
-                    messages=self.chat_history
-                )
-                response = final_response
-            else:
-                response = response
+                    
+                    print("===============================================")
+                    dabi_print(f"Tool call: {self.chat_history[-1]=}")
+                    print("===============================================")
 
+                    for tool_call in tool_calls:
+                        args = json.loads(tool_call.function.arguments)
+
+                        result = await globals()[tool_call.function.name](**args)
+
+                        self.chat_history.append({
+                            "role": "tool",
+                            "content": json.dumps(result),
+                            "tool_call_id": tool_call.id
+                        })
+                    final_response = await client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=self.chat_history
+                    )
+                    response = final_response
+                else:
+                    response = response
+            except Exception as e:
+                print_error(e)
+                response = ERROR_MSG
+                response["choices"][0]["message"] = {'role': 'assistant', 'content': 'Sorry, there was an exception. '+str(e)}
+                self.reset_memory()
         except Exception as e:
             print_error(e)
             response = ERROR_MSG
