@@ -8,6 +8,12 @@ test*
 *.wav
 .vs
 *.log
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.mp4
+*.webm
 
 # Unwanted file types
 *.txt
