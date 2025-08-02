@@ -19,6 +19,8 @@ first_unix_timestamp_float = first_now.timestamp()
 last_msg_time = int(first_unix_timestamp_float)
 chat_messages = []
 
+time_to_read_chat = 60
+
 # ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN')   # Generated from your authentication mechanism, make sure it is scoped properly
 CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')   # The channel ID of the channel you want to join
 CLIENT_ID = os.getenv('DABI_CLIENT_ID')         # The same Client ID used to generate the access token
@@ -28,11 +30,12 @@ async def collect_messages(message):
         return None
     global last_msg_time
     global chat_messages
+    global time_to_read_chat
     now = datetime.now()
     unix_timestamp_float = now.timestamp()
     this_msg_time = int(unix_timestamp_float)
     chat_messages.append(message)
-    if (len(chat_messages) >= 10) or ((this_msg_time - last_msg_time) > 10):
+    if (len(chat_messages) >= 10) or ((this_msg_time - last_msg_time) > time_to_read_chat):
         msg_usernames   = []
         formatted_msgs  = []
         msg_msgs        = []
@@ -49,6 +52,7 @@ async def collect_messages(message):
         now = datetime.now()
         unix_timestamp_float = now.timestamp()
         last_msg_time = int(unix_timestamp_float)
+        chat_messages = []
         return formatted_return
     else:
         return None
@@ -160,14 +164,24 @@ async def handle_redemptions(event):
             dabi_print(f"{formatted_received=}")
             response = await timeout_user(formatted_received)
         case "brb":
-            global_chat_mode = True
-            brb_msg = {
-                "msg_user": "pdgeorge",
-                "msg_server": "pdgeorge",
-                "msg_msg": "Can you look after chat while I'm away? Thanks bro.",
-                "formatted_msg": "twitch:pdgeorge: Can you look after chat while I'm away? Thanks bro."
-            }
-            global_input_msg_queue.put(json.dumps(brb_msg))
+            if global_chat_mode:
+                global_chat_mode = False
+                brb_msg = {
+                    "msg_user": "pdgeorge",
+                    "msg_server": "pdgeorge",
+                    "msg_msg": "Ok, I'm back. Thanks for looking after chat.",
+                    "formatted_msg": "twitch:pdgeorge: Ok, I'm back. Thanks for looking after chat."
+                }
+                global_input_msg_queue.put(json.dumps(brb_msg))
+            else:
+                global_chat_mode = True
+                brb_msg = {
+                    "msg_user": "pdgeorge",
+                    "msg_server": "pdgeorge",
+                    "msg_msg": "Can you look after chat while I'm away? Thanks bro.",
+                    "formatted_msg": "twitch:pdgeorge: Can you look after chat while I'm away? Thanks bro."
+                }
+                global_input_msg_queue.put(json.dumps(brb_msg))
 
 async def timeout_user(msg):
     formatted_return = None
@@ -253,7 +267,7 @@ async def on_message(ws, message):
                 'type': 'channel.raid',
                 'version': '1',
                 'condition': {
-                    "from_broadcaster_user_id": CHANNEL_ID
+                    "to_broadcaster_user_id": CHANNEL_ID
                 },
                 'transport': {
                     'method': 'websocket',

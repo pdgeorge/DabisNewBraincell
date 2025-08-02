@@ -45,7 +45,6 @@ TIKTOK_TOKEN = os.getenv("TIKTOK_TOKEN")
 CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')
 CLIENT_ID = os.getenv('DABI_CLIENT_ID')
 
-
 client = AsyncOpenAI(
     base_url=BASE_URL,
     api_key=APIKEY
@@ -95,6 +94,10 @@ def load_tools():
         data = json.load(f)
     if data:
         return data.get('programs')
+
+async def inspiro(val: str):
+    print(f"==============={val=}================")
+    return "Successfully inspired!"
 
 async def send_right_paddle(val: int):
     dabi_print(f"Sending {val} to send_right_paddle.")
@@ -275,11 +278,13 @@ class OpenAI_Bot():
                 else:
                     response = response
             except Exception as e:
+                print("281")
                 print_error(e)
                 response = ERROR_MSG
                 response["choices"][0]["message"] = {'role': 'assistant', 'content': 'Sorry, there was an exception. '+str(e)}
                 self.reset_memory()
         except Exception as e:
+            print("287")
             print_error(e)
             response = ERROR_MSG
             response["choices"][0]["message"] = {'role': 'assistant', 'content': 'Sorry, there was an exception. '+str(e)}

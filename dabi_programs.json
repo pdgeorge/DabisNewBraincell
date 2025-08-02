@@ -4,7 +4,7 @@
             "type": "function",
             "function": {
                 "name": "timeout_user",
-                "description": "Timeout one user for a period of time",
+                "description": "Timeout one user for a period of time of your choice.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -22,6 +22,7 @@
                         }
                     },
                     "required": [
+                        "callers_name",
                         "user_name",
                         "length"
                     ]
@@ -31,14 +32,14 @@
         {
             "type": "function",
             "function": {
-                "name": "play_breakout",
-                "description": "Begin playing breakout for a period of time (up to 100 seconds) against Twitch chat, who have a severe disadvantage against you. You will then care strongly about the score",
+                "name": "inspiro",
+                "description": "Provide an incredibly inspirational message. A bold and impassioned speech that will speak to the hearts of generations",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "val": {
-                            "type": "number",
-                            "description": "Value between 0 and 100 for how long you will play breakout against Twitch chat"
+                            "type": "string",
+                            "description": "A bold and impassioned speech that will speak to the hearts of generations"
                         }
                     },
                     "required": [
