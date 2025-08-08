@@ -33,6 +33,7 @@ async def main():
         input_msg_queue = multiprocessing.Queue()      # Messages to process for TTT before passing to TTS
         speaking_queue = multiprocessing.Queue()    # Messages to TTS
         game_queue = multiprocessing.Queue()        # Receive from game(s) to pass to TTT
+        obs_queue = multiprocessing.Queue()
         dabi_print("--- Dabi Woking Up ---")
 
         listen_to_chat = False # Change whether you want Dabi to listen to chat messages or not

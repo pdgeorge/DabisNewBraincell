@@ -26,6 +26,7 @@ import random
 import breakout_play
 from inspogenerator import InspoGenerator
 from dabi_logging import dabi_print
+from OBS_Websockets import OBSWebsocketsManager
 
 load_dotenv()
 
@@ -75,6 +76,11 @@ def normalise_dir(dir):
     normalised_dir = os.path.normpath(os.path.join(current_dir, dir))
     return normalised_dir
 
+def _inspire_helper(maker):
+    obs_websocketmanager = OBSWebsocketsManager()
+    maker.run()
+    asyncio.run(obs_websocketmanager.temp_display("DabiSpirations", 15))
+
 ########################################################################
 ####################### ALL OF THE TOOLS GO HERE #######################
 ########################################################################
@@ -102,8 +108,9 @@ async def inspire(speech: str, background: str):
         query=background,
         text=speech
     )
-    async with asyncio.timeout(20):
-        return await asyncio.to_thread(maker.run)
+    async with asyncio.timeout(30):
+        await asyncio.to_thread(_inspire_helper(maker))
+    
 
 async def send_right_paddle(val: int):
     dabi_print(f"Sending {val} to send_right_paddle.")
