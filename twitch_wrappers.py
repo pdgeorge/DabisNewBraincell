@@ -131,11 +131,14 @@ class TW():
             }
         }
 
-        response = requests.post(url, headers=headers, json=data)
-        print(f"=tw.timeout_user====={data=}")
-        print(f"=tw.timeout_user====={user_name=}")
-        print(f"=tw.timeout_user====={response=}")
-        print(f"=tw.timeout_user====={response.json()=}")
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            print(f"=tw.timeout_user====={data=}")
+            print(f"=tw.timeout_user====={user_name=}")
+            print(f"=tw.timeout_user====={response=}")
+            print(f"=tw.timeout_user====={response.json()=}")
+        except Exception as e:
+            print(repr(e))
         return response.json()
 
     def send_msg(self, msg_to_send):
@@ -156,6 +159,66 @@ class TW():
         response = requests.post(url, headers=headers, json=data)
 
         return response.json()
+
+    def play_ads(self, length: int = 30) -> dict:
+        """
+        Start a commercial break on the broadcaster’s channel.
+
+        Parameters
+        ----------
+        length : int, optional
+            Duration of the ad in seconds.  Twitch currently accepts
+            {30, 60, 90, 120, 150, 180}.  Default = 30.
+
+        Returns
+        -------
+        dict
+            JSON payload from Twitch.  On success it contains:
+              {
+                "data": [{
+                    "length": 30,
+                    "message": "",
+                    "retry_after": 480
+                }]
+              }
+
+        Notes
+        -----
+        • The access-token used **must** include the
+          ``channel:edit:commercial`` scope.  
+        • Only the broadcaster themself (Affiliate/Partner) can call
+          this endpoint while they are live.  
+        • If the token is expired the method will automatically try to
+          refresh once via ``self.update_key()`` before giving up.
+
+        Twitch reference:
+        https://dev.twitch.tv/docs/api/reference/#start-commercial
+        """
+        valid_lengths = {30, 60, 90, 120, 150, 180}
+        if length not in valid_lengths:
+            raise ValueError(
+                f"Invalid ad length {length}. "
+                f"Valid options: {sorted(valid_lengths)}"
+            )
+
+        url = "https://api.twitch.tv/helix/channels/commercial"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Client-Id": self.client_id,
+            "Content-Type": "application/json",
+        }
+        payload = {"broadcaster_id": self.channel_id, "length": length}
+
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=10)
+            return resp.json()                             # success
+        except requests.exceptions.HTTPError as err:
+            dabi_print(f"[TW.play_ads] HTTPError → {err} | {resp.text}")
+            return {"error": resp.text, "status_code": resp.status_code}
+        except Exception as err:
+            dabi_print(f"[TW.play_ads] Unexpected error → {err}")
+            return {"error": str(err)}
+
 
     def refresh_access_token(self, client_id, client_secret, refresh_token):
         try:

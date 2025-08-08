@@ -1,10 +1,14 @@
 import asyncio
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 import multiprocessing
 import json
-from typing import Any
+from typing import Any, List
+import os, uuid, shutil, pathlib
+
+MEDIA_DIR = pathlib.Path("uploads")
+MEDIA_DIR.mkdir(exist_ok=True)
 
 def format_string_msg(msg_msg) -> str:
     formatted_return = {
@@ -54,7 +58,7 @@ def start_receiving(
 
     @app.get("/health")
     async def health() -> dict[str, str]:  # noqa: D401 – simple verb is fine
-        """Lightweight health‑check endpoint for load balancers."""
+        """Lightweight health-check endpoint for load balancers."""
         """
         For testing, use the following curl command, remember to update url and port as needed:
         curl -X GET http://0.0.0.0:9000/health
@@ -96,6 +100,36 @@ def start_receiving(
             raise HTTPException(status_code=503, detail="Event queue full") from exc
 
         return {"status": "accepted"}
+
+    @app.post("/review")
+    async def receive_review(
+        message: str = Form(...),
+        uploads: List[UploadFile] = File(default=[]),
+    ):
+        if not message.strip():
+            raise HTTPException(400, "Message is required")
+        
+        allowed = {".jpg", ".jpeg", ".png", ".gif", ".mp4", ".webm"}
+        saved = []
+        for file in uploads:
+            ext = pathlib.Path(file.filename).suffix.lower()
+            if ext not in allowed:
+                raise HTTPException(415, f"{file.filename}: unsupported type")
+            
+            uid = f"{uuid.uuid4()}{ext}"
+            dest = MEDIA_DIR / uid
+            with dest.open("wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            saved.append(dest.name)
+
+        # Add "add_to_queue" sort of thing here, IDK
+        # Alternative: The files are going to be piped in to a different model that "understands" what is inside of the files. 
+        # It will describe their contents. That model will send the contents towards Dabi.
+        # Choices: A) Listener that reacts whenever uploads folder receives a new file. 
+        # B) An event that we send here TO the model to say "OI! Look for "this file"
+        # I like A more, because then I can directly drop the file in without needing to upload through DabiBraincellFixer
+
+        return {"ok": True, "files": saved}
 
     # Start the ASGI server (blocks until KeyboardInterrupt or process exit)
     uvicorn.run(app, host=host, port=port, log_level=log_level, access_log=True)
@@ -156,7 +190,7 @@ def queue_printer(event_queue: multiprocessing.Queue) -> None:
 #     print("Server listening on http://127.0.0.1:8000\nPress Ctrl+C to exit.")
 
 #     try:
-#         queue_printer(q)  # runs until Ctrl‑C
+#         queue_printer(q)  # runs until Ctrl-C
 #     except KeyboardInterrupt:
 #         print("\nShutting down …", flush=True)
 #         server_proc.terminate()

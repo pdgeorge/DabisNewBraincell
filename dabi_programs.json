@@ -4,7 +4,7 @@
             "type": "function",
             "function": {
                 "name": "timeout_user",
-                "description": "Timeout one user for a period of time",
+                "description": "Timeout one user for a period of time of your choice.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -22,6 +22,7 @@
                         }
                     },
                     "required": [
+                        "callers_name",
                         "user_name",
                         "length"
                     ]
@@ -31,18 +32,24 @@
         {
             "type": "function",
             "function": {
-                "name": "play_breakout",
-                "description": "Begin playing breakout for a period of time (up to 100 seconds) against Twitch chat, who have a severe disadvantage against you. You will then care strongly about the score",
+                "name": "inspire",
+                "description": "Create a shareable inspirational card/overlay. Use this when the user asks to inspire, motivate, hype up, pep talk, rally the team, or needs a short inspirational line for stream or socials. You must invent a 5-10 word headline and pass it as `speech`.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "val": {
-                            "type": "number",
-                            "description": "Value between 0 and 100 for how long you will play breakout against Twitch chat"
+                        "speech": {
+                            "type": "string",
+                            "description": "Exactly 5-10 words. No emojis, no hashtags, no quotes. Example: 'This hill is yours today'.",
+                            "pattern": "^(?:\\S+\\s+){4,9}\\S+$"
+                        },
+                        "background": {
+                            "type": "string",
+                            "description": "Choose a backdrop image for your epic speech."
                         }
                     },
                     "required": [
-                        "val"
+                        "speech",
+                        "background"
                     ]
                 }
             }
