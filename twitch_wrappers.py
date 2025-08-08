@@ -131,11 +131,14 @@ class TW():
             }
         }
 
-        response = requests.post(url, headers=headers, json=data)
-        print(f"=tw.timeout_user====={data=}")
-        print(f"=tw.timeout_user====={user_name=}")
-        print(f"=tw.timeout_user====={response=}")
-        print(f"=tw.timeout_user====={response.json()=}")
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            print(f"=tw.timeout_user====={data=}")
+            print(f"=tw.timeout_user====={user_name=}")
+            print(f"=tw.timeout_user====={response=}")
+            print(f"=tw.timeout_user====={response.json()=}")
+        except Exception as e:
+            print(repr(e))
         return response.json()
 
     def send_msg(self, msg_to_send):

@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from twitch_wrappers import TW
 import random
 import breakout_play
+from inspogenerator import InspoGenerator
 from dabi_logging import dabi_print
 
 load_dotenv()
@@ -35,7 +36,7 @@ DEFAULT_NAME = "TAI" # Which personality is being loaded
 MESSAGE_CHANCE = 5 # Chance for user name to be included in the message, 1 in MESSAGE_CHANGE
 SYSTEM_MESSAGE = "You are 'BasedMod', moderator of a Twitch community you really do not like. This community is a community of people who watch v-tubers. In fact you greatly enjoy roasting them. Every time that you receive a message, you give a brief, one sentence vitriolic rant about the individual and what they said before declaring that they are banned followed by an inventive way that they are banished from the internet."
 WAKE_UP_MESSAGE = "It's time to wake up."
-# APIKEY = os.getenv("OPENAI_API_KEY") # For OPENAI
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") # For OPENAI
 BASE_URL="https://api.deepseek.com"
 APIKEY = os.getenv("DEEPSEEK_API_KEY") # For DEEPSEEK
 USER_ID = os.getenv("PLAY_HT_USER_ID")
@@ -95,9 +96,14 @@ def load_tools():
     if data:
         return data.get('programs')
 
-async def inspiro(val: str):
-    print(f"==============={val=}================")
-    return "Successfully inspired!"
+async def inspire(speech: str, background: str):
+    print(f"==============={speech=}, {background=}================")
+    maker = InspoGenerator(
+        query=background,
+        text=speech
+    )
+    async with asyncio.timeout(20):
+        return await asyncio.to_thread(maker.run)
 
 async def send_right_paddle(val: int):
     dabi_print(f"Sending {val} to send_right_paddle.")
@@ -118,10 +124,10 @@ async def timeout_user(callers_name: str, user_name: str, length: int = 10):
 
     exists = user_name.lower() in moderators
 
-    if (russian_roulette < 95 or exists) and callers_name.upper() != 'PDGEORGE':
+    if (russian_roulette < 50 or exists) and callers_name.upper() != 'PDGEORGE':
         user_name = callers_name
 
-    print(f"timeout_user, {russian_roulette=}, ")
+    print(f"Russian_roulette: {russian_roulette=} timing out: {user_name=}")
     if type(length) is int:
         if length == 0 or length > 100 or length < 0:
             length = 10

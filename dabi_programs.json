@@ -32,18 +32,24 @@
         {
             "type": "function",
             "function": {
-                "name": "inspiro",
-                "description": "Provide an incredibly inspirational message. A bold and impassioned speech that will speak to the hearts of generations",
+                "name": "inspire",
+                "description": "Create a shareable inspirational card/overlay. Use this when the user asks to inspire, motivate, hype up, pep talk, rally the team, or needs a short inspirational line for stream or socials. You must invent a 5-10 word headline and pass it as `speech`.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "val": {
+                        "speech": {
                             "type": "string",
-                            "description": "A bold and impassioned speech that will speak to the hearts of generations"
+                            "description": "Exactly 5-10 words. No emojis, no hashtags, no quotes. Example: 'This hill is yours today'.",
+                            "pattern": "^(?:\\S+\\s+){4,9}\\S+$"
+                        },
+                        "background": {
+                            "type": "string",
+                            "description": "Choose a backdrop image for your epic speech."
                         }
                     },
                     "required": [
-                        "val"
+                        "speech",
+                        "background"
                     ]
                 }
             }

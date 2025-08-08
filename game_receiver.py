@@ -58,7 +58,7 @@ def start_receiving(
 
     @app.get("/health")
     async def health() -> dict[str, str]:  # noqa: D401 – simple verb is fine
-        """Lightweight health‑check endpoint for load balancers."""
+        """Lightweight health-check endpoint for load balancers."""
         """
         For testing, use the following curl command, remember to update url and port as needed:
         curl -X GET http://0.0.0.0:9000/health
@@ -111,12 +111,9 @@ def start_receiving(
         
         allowed = {".jpg", ".jpeg", ".png", ".gif", ".mp4", ".webm"}
         saved = []
-        print(f"=========={len(uploads)=}")
         for file in uploads:
             ext = pathlib.Path(file.filename).suffix.lower()
-            print(f"=== ext is: {ext=}")
             if ext not in allowed:
-                print(f"{ext=}")
                 raise HTTPException(415, f"{file.filename}: unsupported type")
             
             uid = f"{uuid.uuid4()}{ext}"
@@ -193,7 +190,7 @@ def queue_printer(event_queue: multiprocessing.Queue) -> None:
 #     print("Server listening on http://127.0.0.1:8000\nPress Ctrl+C to exit.")
 
 #     try:
-#         queue_printer(q)  # runs until Ctrl‑C
+#         queue_printer(q)  # runs until Ctrl-C
 #     except KeyboardInterrupt:
 #         print("\nShutting down …", flush=True)
 #         server_proc.terminate()
