@@ -76,10 +76,9 @@ def normalise_dir(dir):
     normalised_dir = os.path.normpath(os.path.join(current_dir, dir))
     return normalised_dir
 
-def _inspire_helper(maker):
-    obs_websocketmanager = OBSWebsocketsManager()
+async def _inspire_helper(maker):
     maker.run()
-    asyncio.run(obs_websocketmanager.temp_display("DabiSpirations", 15))
+    asyncio.run()
 
 ########################################################################
 ####################### ALL OF THE TOOLS GO HERE #######################
@@ -108,8 +107,9 @@ async def inspire(speech: str, background: str):
         query=background,
         text=speech
     )
-    async with asyncio.timeout(30):
-        await asyncio.to_thread(_inspire_helper(maker))
+    maker.run()
+    obs_websocketmanager = OBSWebsocketsManager()
+    await obs_websocketmanager.temp_display("DabiSpirations", 15)
     
 
 async def send_right_paddle(val: int):

@@ -66,11 +66,9 @@ class OBSWebsocketsManager():
         delay = duration / steps
         id = self.get_item_id(scene_name, element_name)
 
-        print("move_up")
         for step in range(1, steps + 1):
             t = step / steps
             current_y = int(start_y + (end_y - start_y) * t)
-            print(f"{current_y}")
             self.ws.call(requests.SetSceneItemTransform(
                 sceneName=scene_name,
                 sceneItemId=id,
@@ -88,11 +86,9 @@ class OBSWebsocketsManager():
         delay = duration / steps
         id = self.get_item_id(scene_name, element_name)
 
-        print("move_up")
         for step in range(1, steps + 1):
             t = step / steps
             current_y = int(start_y + (end_y - start_y) * t)
-            print(f"{current_y}")
             self.ws.call(requests.SetSceneItemTransform(
                 sceneName=scene_name,
                 sceneItemId=id,
@@ -100,17 +96,6 @@ class OBSWebsocketsManager():
                     "positionX": 0,
                     "positionY": current_y
                 }))
-            await asyncio.sleep(delay)
-
-        print("move_down")
-        for step in range(1, steps + 1):
-            t = step / steps
-            current_y = int(start_y + (end_y - start_y) * t)
-            print(f"{current_y}")
-            self.ws.call(requests.SetSceneItemPosition(
-                item=element_name, 
-                x=0, 
-                y=current_y))
             await asyncio.sleep(delay)
 
     def source_checker(self, scene_name):
@@ -122,13 +107,11 @@ class OBSWebsocketsManager():
         response = self.ws.call(requests.GetCurrentProgramScene())
         current_scene_name = response.getSceneName()
         start_time = time.time()
-        print("On")
         self.set_source_visibility(current_scene_name, element_name, True)
         await self.move_up(current_scene_name, element_name)
         while time.time() < (start_time + input_time):
             await asyncio.sleep(0.1)
         await self.move_down(current_scene_name, element_name)
-        print("off")
         self.set_source_visibility(current_scene_name, element_name, False)
         return
 
