@@ -30,7 +30,7 @@ CABLE_A_OUTPUT = 26 # This was found using dabi.scan_audio_devices()
 
 global_speaking_queue = None
 global_game_queue = None
-read_message_flag = False
+read_chat_flag = False
 last_msg_time = None
 chat_messages = []
 
@@ -102,6 +102,7 @@ async def choose_action(msg, dabi):
 # Removes "twitch:" and "speaks" the message
 async def speak_message(message, dabi):
     to_send = None
+    response = ""
     
     twitch_prefix = "twitch:"
     game_prefix = "game:"
@@ -109,20 +110,30 @@ async def speak_message(message, dabi):
     website_prefix = "website:"
     discord_prefix = "discord:"
     message_prefix = "message:"
+    react_prefix = "react:"
     if message["formatted_msg"].startswith(twitch_prefix):
         send_to_dabi = message["formatted_msg"][len(twitch_prefix):]
+        response = await dabi.send_msg(send_to_dabi)
     if message["formatted_msg"].startswith(game_prefix):
         send_to_dabi = message["formatted_msg"][len(game_prefix):]
+        response = await dabi.send_msg(send_to_dabi)
     if message["formatted_msg"].startswith(website_prefix):
         send_to_dabi = message["formatted_msg"][len(website_prefix):]
+        response = await dabi.send_msg(send_to_dabi)
     if message["formatted_msg"].startswith(discord_prefix):
         send_to_dabi = message["formatted_msg"][len(discord_prefix):]
+        response = await dabi.send_msg(send_to_dabi)
     if message["formatted_msg"].startswith(action_prefix):
         send_to_dabi = await choose_action(message["formatted_msg"][len(action_prefix):], dabi)
-    if message["formatted_msg"].startswith(message_prefix) and read_message_flag:
+        response = await dabi.send_msg(send_to_dabi)
+    if message["formatted_msg"].startswith(message_prefix) and read_chat_flag:
         send_to_dabi = message["formatted_msg"][len(message_prefix):]
-    
-    response = await dabi.send_msg(send_to_dabi)
+        response = await dabi.send_msg(send_to_dabi)
+    if message["formatted_msg"].startswith(react_prefix):
+        send_to_dabi_img = message["file_name"]
+        send_to_dabi_msg = message["formatted_msg"][len(react_prefix):]
+        response = await dabi.send_img(send_to_dabi_img, send_to_dabi_msg)
+
     dabi_print(f"{response=}")
     
     voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)

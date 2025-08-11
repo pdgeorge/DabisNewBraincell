@@ -5,10 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import multiprocessing
 import json
 from typing import Any, List
-import os, uuid, shutil, pathlib
+import uuid, shutil, pathlib
+from pathlib import Path
 
 MEDIA_DIR = pathlib.Path("uploads")
 MEDIA_DIR.mkdir(exist_ok=True)
+
+BASE = Path(__file__).resolve().parent
 
 def format_string_msg(msg_msg) -> str:
     formatted_return = {
@@ -34,6 +37,17 @@ def format_string_website(msg_msg) -> str:
         "msg_server": "Pdgeorge",
         "msg_msg": msg_msg,
         "formatted_msg": f"website:Dabi: {msg_msg}"
+    }
+    return formatted_return
+
+def format_string_react(msg_msg, file_name) -> str:
+    img_path = str(BASE / "uploads" / file_name)
+    formatted_return = {
+        "msg_user": "Dabi",
+        "msg_server": "Pdgeorge",
+        "msg_msg": msg_msg,
+        "file_name": img_path,
+        "formatted_msg": f"react:Dabi: {msg_msg}"
     }
     return formatted_return
 
@@ -121,6 +135,9 @@ def start_receiving(
             with dest.open("wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             saved.append(dest.name)
+            file_name = str(dest.name)
+            to_send = format_string_react(message, file_name)
+            event_queue.put(json.dumps(to_send))
 
         # Add "add_to_queue" sort of thing here, IDK
         # Alternative: The files are going to be piped in to a different model that "understands" what is inside of the files. 

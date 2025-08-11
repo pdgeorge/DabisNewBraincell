@@ -28,6 +28,8 @@ from inspogenerator import InspoGenerator
 from dabi_logging import dabi_print
 from OBS_Websockets import OBSWebsocketsManager
 
+from pathlib import Path
+
 load_dotenv()
 
 TEXT_DIR = "./"
@@ -37,15 +39,20 @@ DEFAULT_NAME = "TAI" # Which personality is being loaded
 MESSAGE_CHANCE = 5 # Chance for user name to be included in the message, 1 in MESSAGE_CHANGE
 SYSTEM_MESSAGE = "You are 'BasedMod', moderator of a Twitch community you really do not like. This community is a community of people who watch v-tubers. In fact you greatly enjoy roasting them. Every time that you receive a message, you give a brief, one sentence vitriolic rant about the individual and what they said before declaring that they are banned followed by an inventive way that they are banished from the internet."
 WAKE_UP_MESSAGE = "It's time to wake up."
-# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") # For OPENAI
-BASE_URL="https://api.deepseek.com"
-APIKEY = os.getenv("DEEPSEEK_API_KEY") # For DEEPSEEK
-USER_ID = os.getenv("PLAY_HT_USER_ID")
-API_KEY = os.getenv("PLAY_HT_API_KEY")
+# APIKEY = os.getenv("DEEPSEEK_API_KEY") # For DEEPSEEK
+# BASE_URL = "https://api.deepseek.com"
+# MODEL = "deepseek-chat"
+APIKEY = os.getenv("OPENAI_API_KEY") # For OPENAI
+BASE_URL = "https://api.openai.com/v1"
+MODEL = "gpt-4o-mini"
+PLAYHT_USER_ID = os.getenv("PLAY_HT_USER_ID")
+PLAYHT_API_KEY = os.getenv("PLAY_HT_API_KEY")
 TIKTOK_TOKEN = os.getenv("TIKTOK_TOKEN")
 
 CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')
 CLIENT_ID = os.getenv('DABI_CLIENT_ID')
+
+BASE = Path(__file__).resolve().parent
 
 client = AsyncOpenAI(
     base_url=BASE_URL,
@@ -229,6 +236,29 @@ class OpenAI_Bot():
         with open(dir, 'w+') as json_file:
             json.dump(contents, json_file)
 
+    async def send_img(self, path_to_img, txt):
+        with open(path_to_img, "rb") as img_file:
+            image_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+
+        response = {}
+        to_send = {}
+        to_send['role'] = 'user'
+        to_send['content'] = [
+                { "type": "text", "text": f"{txt}" },
+                {
+                    "type": "image_url",
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_base64}"
+                    }
+                }
+            ]
+        self.chat_message = to_send
+
+        response = await self.send_to_llm(response=response)
+
+        return response
+
     # Send message to LLM, returns response
     async def send_msg(self, data_to_give):
         response = {}
@@ -236,12 +266,15 @@ class OpenAI_Bot():
         to_send['role'] = 'user'
         to_send['content'] = data_to_give
         self.chat_message = to_send
-        tool_calls = None
 
+        return await self.send_to_llm(response=response)
+
+    async def send_to_llm(self, response):
+        tool_calls = None
         self.chat_history.append(self.chat_message)
         try:
             response = await client.chat.completions.create(
-                model="deepseek-chat",
+                model=MODEL,
                 messages=self.chat_history,
                 temperature=0.6,
                 max_tokens=100,
@@ -309,7 +342,7 @@ class OpenAI_Bot():
         self.chat_history.append(bot_response)
 
         dabi_print(f"{bot_response=}")
-        if response.usage.total_tokens > 3500:
+        if response.usage.total_tokens > 135000:
             del self.chat_history[1]
             del self.chat_history[1]
             del self.chat_history[1]
@@ -458,8 +491,8 @@ class OpenAI_Bot():
 
     async def playHT_wav_generator(self, to_generate):
         client = Client(
-            user_id=USER_ID,
-            api_key=API_KEY,
+            user_id=PLAYHT_USER_ID,
+            api_key=PLAYHT_API_KEY,
         )
         filename = None
         try:
@@ -595,9 +628,16 @@ async def testing_main():
     # await asyncio.sleep(se_duration)
     # print("Test complete")
 
-    msg_to_test = "Can you please timeout t_b0n3?"
-    response = await test_bot.send_msg(msg_to_test)
-    print(response)
+    # msg_to_test = "Can you please timeout t_b0n3?"
+    # response = await test_bot.send_msg(msg_to_test)
+    # print(response)
+    # response = ""
+
+    img_to_test = BASE / "uploads" / "ExampleNyara.png"
+    print(f"{img_to_test=}")
+    msg_to_test_img = "Would you dance with this person?"
+    response = await test_bot.send_img(img_to_test, msg_to_test_img)
+    print(f"Image Test: {response=}")
 
 if __name__ == "__main__":
     asyncio.run(testing_main())
