@@ -237,7 +237,6 @@ class OpenAI_Bot():
             json.dump(contents, json_file)
 
     async def send_img(self, path_to_img, txt):
-        print("\n\nsend_img\n\n")
         with open(path_to_img, "rb") as img_file:
             image_base64 = base64.b64encode(img_file.read()).decode("utf-8")
 
@@ -343,15 +342,12 @@ class OpenAI_Bot():
         self.chat_history.append(bot_response)
 
         dabi_print(f"{bot_response=}")
-        print(f"{response=}")
         if response.usage.total_tokens > 135000:
             del self.chat_history[1]
             del self.chat_history[1]
             del self.chat_history[1]
 
         self.save_json_to_file(self.chat_history, self.bot_file)
-
-        print(f"{response=}")
 
         return response.choices[0].message.content
     

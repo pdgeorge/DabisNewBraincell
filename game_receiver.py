@@ -125,7 +125,6 @@ def start_receiving(
         
         allowed = {".jpg", ".jpeg", ".png", ".gif", ".mp4", ".webm"}
         saved = []
-        print(f"{message=}")
         for file in uploads:
             ext = pathlib.Path(file.filename).suffix.lower()
             if ext not in allowed:
@@ -137,7 +136,6 @@ def start_receiving(
                 shutil.copyfileobj(file.file, buffer)
             saved.append(dest.name)
             file_name = str(dest.name)
-            print(f"{file_name=}")
             to_send = format_string_react(message, file_name)
             event_queue.put(json.dumps(to_send))
 
