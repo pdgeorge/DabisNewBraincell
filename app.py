@@ -133,8 +133,6 @@ async def speak_message(message, dabi):
         send_to_dabi_img = message["file_name"]
         send_to_dabi_msg = message["formatted_msg"][len(react_prefix):]
         response = await dabi.send_img(send_to_dabi_img, send_to_dabi_msg)
-    
-    print(f"{message=}")
 
     dabi_print(f"{response=}")
     
