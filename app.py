@@ -91,12 +91,13 @@ async def choose_action(msg, dabi):
     if 'reset' in msg:
         print("===resetting===")
         return await reset(dabi)
-    if 'load_personality' in msg:
+    if 'personality' in msg:
         print("!!!Load personalidy found!!!")
-        # TODO Add in "Load Personality" here. 
-        # personality_to_load = msg.personality_to_load (or whatever I do)
-        # load_new_personality(dabi, personality_to_load)
-        return msg
+        personality_prefix = "action:personality:"
+        personality_to_load = msg[len(personality_prefix):]
+        load_new_personality(dabi, personality_to_load)
+        return_string = f"Reawakening as {personality_to_load}"
+        return return_string
 
 # Takes in the message received from twitch_connector
 # Removes "twitch:" and "speaks" the message
