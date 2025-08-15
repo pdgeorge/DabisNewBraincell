@@ -317,7 +317,7 @@ class OpenAI_Bot():
                             "tool_call_id": tool_call.id
                         })
                     final_response = await client.chat.completions.create(
-                        model="deepseek-chat",
+                        model=MODEL,
                         messages=self.chat_history
                     )
                     response = final_response
