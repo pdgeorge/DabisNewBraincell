@@ -159,10 +159,12 @@ async def handle_redemptions(event):
             to_send = await extract_message_to_send_points(event)
             dabi_print(f"{to_send=}")
             global_input_msg_queue.put(json.dumps(to_send))
-        case "timeout":
+        case "InspireMe":
             formatted_received = await extract_message_to_send_points(event)
-            dabi_print(f"{formatted_received=}")
-            response = await timeout_user(formatted_received)
+            dabi_print(formatted_received)
+            temp_send = f"Inspire {formatted_received.get("msg_username", "")} Dabi! On the topic of {formatted_received.get("msg_msg", "")}"
+            formatted_received["formatted_msg"] = f"twitch:{formatted_received.get("msg_username", "")}: {temp_send}"
+            global_input_msg_queue.put(json.dumps(formatted_received))
         case "brb":
             if global_chat_mode:
                 global_chat_mode = False

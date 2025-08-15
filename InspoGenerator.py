@@ -85,17 +85,13 @@ class InspoGenerator:
 
     def run(self) -> str:
         """End-to-end: search -> download -> choose -> process -> save. Returns output path."""
-        print("checking creds")
         self._require_creds()
-        print("Searching")
         results = self.search_images(self.query)
-        print("Downloading")
         imgs = self.download_top_images(results)
         if not imgs:
             raise RuntimeError("Failed to download any of the top results.")
         chosen = random.choice(imgs)
         final = self.process_image(chosen)
-        print("Adding text")
         self.overlay_text(final)
         final.save(self.out_path, "PNG")
         return self.out_path
