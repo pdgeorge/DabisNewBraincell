@@ -1,5 +1,8 @@
 import os
 import asyncio
+import threading
+from io import BytesIO
+import anyio
 import tempfile
 import json
 import discord # Pycord 2.5+, `py-cord[voice]`
@@ -8,6 +11,11 @@ import whisper
 from pathlib import Path
 from pydub import AudioSegment
 from dotenv import load_dotenv
+import uvicorn
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from urllib.parse import urlparse
+from urllib.request import urlopen
 from dabi_logging import dabi_print
 
 import whisper, torch
@@ -22,6 +30,8 @@ DEFAULT_RECORD = 10
 PRIVILEGED_ROLES = {"TheGuyInChargeIGuess", "Cyra-chatter"}
 
 TMP_DIR = Path("./tmp"); TMP_DIR.mkdir(exist_ok=True)
+
+DABISPIRATIONS = 1408392122649935913
 
 # ----------  Discord client  ---------------
 intents = discord.Intents.all()
@@ -100,6 +110,25 @@ async def do_transcribe(ctx: discord.ApplicationContext,
     vc.start_recording(sink, on_finish)
     await asyncio.sleep(seconds)
     vc.stop_recording()                     # triggers on_finish
+
+async def _resolve_dabispirations_channel():
+    ch = bot.get_channel(DABISPIRATIONS)
+    if isinstance(ch, discord.TextChannel):
+        return ch
+    
+    for guild in bot.guilds:
+        for ch in guild.text_channels:
+            if ch.name.lower() == "dabispirations":
+                return ch
+
+async def _send_image_to_discord(image_bytes: bytes, filename: str, caption: str):
+    channel = await _resolve_dabispirations_channel()
+    if channel is None:
+        raise RuntimeError("Couldn't find #dabispirations")
+    
+    file = discord.File(BytesIO(image_bytes), filename=filename)
+    msg = await channel.send(content=caption or None, file=file)
+    return {"message_id": msg.id, "channel_id": channel.id, "filename": filename}
 
 connections = {}
 global_input_msg_queue = None
@@ -205,7 +234,7 @@ async def listen(ctx: discord.ApplicationContext):
 @commands.has_any_role(*PRIVILEGED_ROLES)
 async def transcribe(
     ctx: discord.ApplicationContext,
-    seconds: discord.Option(int, "Seconds to record (1‑120)", default=DEFAULT_RECORD, min_value=1, max_value=120) # type: ignore
+    seconds: discord.Option(int, "Seconds to record (1-120)", default=DEFAULT_RECORD, min_value=1, max_value=120) # type: ignore
 ):
     await ctx.respond("One shot transcribe starting!")
     await do_transcribe(ctx=ctx, seconds=seconds)
@@ -230,13 +259,111 @@ async def test_listening(ctx: discord.ApplicationContext):
     global listening_flag
     await ctx.respond(f"listening_flag is {listening_flag}")
 
-# --------------------------------------------------------
-#  ENTRY‑POINT  (keeps your start_bot signature unchanged)
-# --------------------------------------------------------
+def start_receiving(
+        *,
+        host: str = "0.0.0.0",
+        port: int = 9000,
+        log_level: str = "info",
+    ) -> None:
+
+    app = FastAPI(title="Discord Event Receiver", version="1.0.0")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"]
+    )
+
+    @app.get("/health")
+    async def health() -> dict[str, str]:  # noqa: D401 – simple verb is fine
+        """Lightweight health-check endpoint for load balancers."""
+        """
+        For testing, use the following curl command, remember to update url and port as needed:
+        curl -X GET http://0.0.0.0:8002/health
+        """
+        return {"status": "ok, Discord"}
+    
+    uvicorn.run(app, host=host, port=port, log_level=log_level, access_log=True)
+
+def build_app() -> FastAPI:
+    app = FastAPI(title="Discord Event Receiver", version="1.0.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"]
+    )
+
+    @app.get("/health")
+    async def health() -> dict[str, str]:  # noqa: D401 – simple verb is fine
+        """Lightweight health-check endpoint for load balancers."""
+        """
+        For testing, use the following curl command, remember to update url and port as needed:
+        curl -X GET http://0.0.0.0:8002/health
+        """
+        return {"status": "ok, Discord"}
+    
+    @app.get("/image")
+    async def post_image_to_dabispirations(
+        path = Query(default=None, description="Absolute path on this machine to an image file"),
+        url  = Query(default=None, description="HTTP(S) URL to an image"),
+        caption = Query(default=None, description="Optional caption to include with the image"),
+        filename = Query(default=None, description="Override filename shown in Discord"),
+    ):
+        """
+        Trigger: GET /image?path=/abs/file.png&caption=Hello
+                GET /image?url=https://example.com/pic.jpg&caption=Yo
+        Effect: Posts the image to #dabispirations via the Discord bot.
+        Note: This endpoint performs a side effect; consider making it POST in production.
+        """
+        if not path and not url:
+            raise HTTPException(status_code=400, detail="Provide either 'path' or 'url'")
+
+        # Load bytes (off the event loop)
+        if path:
+            p = Path(path)
+            if not (p.exists() and p.is_file()):
+                raise HTTPException(status_code=400, detail=f"Path not found or not a file: {path}")
+            image_bytes = await anyio.to_thread.run_sync(p.read_bytes)
+            fname = filename or p.name
+        else:
+            # Basic fetch with stdlib; keep it simple (use POST+UploadFile if you want streaming/validation)
+            def _fetch():
+                with urlopen(url) as r:  # nosec - trusted internal use; secure in production
+                    return r.read()
+            try:
+                image_bytes = await anyio.to_thread.run_sync(_fetch)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to fetch url: {e}")
+            parsed = urlparse(url)
+            fname = filename or Path(parsed.path).name or "image"
+
+        # Hand off to the Discord bot's loop and wait for result
+        try:
+            fut = asyncio.run_coroutine_threadsafe(
+                _send_image_to_discord(image_bytes, fname, caption),
+                bot.loop
+            )
+            result = await anyio.to_thread.run_sync(lambda: fut.result(timeout=20))
+            return {"status": "ok", **result}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to post image: {e}")
+    
+    return app
+
+def start_receiving_in_thread():
+    t = threading.Thread(target=lambda: uvicorn.run(build_app(), host="127.0.0.1", port=8002, log_level="info"), daemon=True)
+    t.start()
+    return t
+
 def start_bot(input_msg_queue, speaking_queue):
     global global_input_msg_queue, global_speaking_queue
     global_input_msg_queue = input_msg_queue
     global_speaking_queue = speaking_queue
+    start_receiving_in_thread()
     bot.run(DISCORD_TOKEN)
 
 if __name__ == "__main__":

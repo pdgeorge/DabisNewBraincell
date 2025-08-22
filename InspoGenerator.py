@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import requests
+import pathlib
 from PIL import Image, ImageDraw, ImageFont
 try:
     from dotenv import load_dotenv
@@ -94,6 +95,7 @@ class InspoGenerator:
         final = self.process_image(chosen)
         self.overlay_text(final)
         final.save(self.out_path, "PNG")
+        requests.get("http://127.0.0.1:8002/image", params={"path": str(pathlib.Path.cwd() / self.out_path), "caption": self.text}).raise_for_status()
         return self.out_path
 
     def search_images(self, query: str) -> List[ImageResult]:

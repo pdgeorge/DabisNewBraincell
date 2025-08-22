@@ -28,9 +28,11 @@ Discord tokens can be generated from https://discordapp.com/developers/applicati
 Please remember that this is a personal project. There are elements which I would be far more scrutinous over in a professional capacity, however in a professional capacity I would not get to have such a cute derp.
 
 # Ports Used
+* game_receiver.py (REST receiver): 8000
+
 * app.py: send message 8001
 
-* Uvicorn (REST receiver): 8000
+* discord_bot.py (Discord receiver): 8002
 
 Linux upgrade:
 sudo apt install build-essential
