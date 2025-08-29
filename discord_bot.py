@@ -130,6 +130,29 @@ async def _send_image_to_discord(image_bytes: bytes, filename: str, caption: str
     msg = await channel.send(content=caption or None, file=file)
     return {"message_id": msg.id, "channel_id": channel.id, "filename": filename}
 
+def _load_personality(personality_to_load):
+    name_to_return = None
+    voice_to_return = None
+    personality_to_return = None
+    base_system = None
+    with open("system.json", "r") as f:
+        data = json.load(f)
+        
+    name_to_return = data["name"]
+    voice_to_return = data["voice"]
+    base_system = data["system"]
+    for personality in data.get("personalities"):
+        if personality.get("personality") == personality_to_load:
+            personality_to_return = personality.get("system", None)
+            break
+        if personality_to_return is None:
+            personality_to_return = data.get("personalities")[0].get("system", None)
+    personality_to_return = base_system + personality_to_return
+    
+    return name_to_return, voice_to_return, personality_to_return
+
+# --------- globals & constants ------------
+discord_dabi = None
 connections = {}
 global_input_msg_queue = None
 global_speaking_queue = None
@@ -154,7 +177,13 @@ async def on_message(message: discord.message):
         return
 
     if message.channel.name == "dabi-talks":
-        await message.channel.send("hello")
+        if discord_dabi is not None:
+            print(f"{message.content=}")
+            dabi_response = await discord_dabi.send_msg(message.content)
+            print(f"{dabi_response=}")
+            await message.channel.send(f"{dabi_response}")
+        else:
+            await message.channel.send("Someone tell George Dabi Bork")
 
 # @tasks.loop(seconds=60)
 # async def voice_keepalive():
@@ -359,8 +388,9 @@ def start_receiving_in_thread():
     t.start()
     return t
 
-def start_bot(input_msg_queue, speaking_queue):
-    global global_input_msg_queue, global_speaking_queue
+def start_bot(input_msg_queue, speaking_queue, dabi):
+    global global_input_msg_queue, global_speaking_queue, discord_dabi
+    discord_dabi = dabi
     global_input_msg_queue = input_msg_queue
     global_speaking_queue = speaking_queue
     start_receiving_in_thread()
@@ -369,6 +399,9 @@ def start_bot(input_msg_queue, speaking_queue):
 if __name__ == "__main__":
     # quick local test run
     import multiprocessing
+    from bot_openai import OpenAI_Bot, load_personality
+    dabi_name, dabi_voice, dabi_system = load_personality("mythicalmentor")
+    discord_dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
     input_msg_queue = multiprocessing.Queue()
     speaking_queue = multiprocessing.Queue()
     start_bot(input_msg_queue, speaking_queue)

@@ -95,7 +95,7 @@ async def choose_action(msg, dabi):
         print("!!!Load personalidy found!!!")
         personality_prefix = "action:personality:"
         personality_to_load = msg[len(personality_prefix):]
-        load_new_personality(dabi, personality_to_load)
+        dabi.load_new_personality(dabi, personality_to_load)
         return_string = f"Reawakening as {personality_to_load}"
         return return_string
 
@@ -169,39 +169,40 @@ async def send_msg(websocket, path, dabi, input_msg_queue, game_queue, speaking_
         await send_msg_helper(queue=game_queue, websocket=websocket, dabi=dabi, speaking_queue=speaking_queue)
         
 
-def load_new_personality(dabi, personality_to_load):
-    dabi_print("Load_new_personality")
-    dabi_name, dabi_voice, dabi_system = load_personality(personality_to_load)
-    dabi.bot_name = dabi_name
-    dabi.voice = dabi_voice
-    dabi.temp_system_message["content"] = dabi_system
-    dabi.reset_memory()
+# def load_new_personality(dabi, personality_to_load):
+#     dabi_print("Load_new_personality")
+#     dabi_name, dabi_voice, dabi_system = load_personality(personality_to_load)
+#     dabi.bot_name = dabi_name
+#     dabi.voice = dabi_voice
+#     dabi.temp_system_message["content"] = dabi_system
+#     dabi.reset_memory()
     
 
-def load_personality(personality_to_load):
-    name_to_return = None
-    voice_to_return = None
-    personality_to_return = None
-    base_system = None
-    with open("system.json", "r") as f:
-        data = json.load(f)
+# def load_personality(personality_to_load):
+#     name_to_return = None
+#     voice_to_return = None
+#     personality_to_return = None
+#     base_system = None
+#     with open("system.json", "r") as f:
+#         data = json.load(f)
         
-    name_to_return = data["name"]
-    voice_to_return = data["voice"]
-    base_system = data["system"]
-    for personality in data.get("personalities"):
-        if personality.get("personality") == personality_to_load:
-            personality_to_return = personality.get("system", None)
-            break
-        if personality_to_return is None:
-            personality_to_return = data.get("personalities")[0].get("system", None)
-    personality_to_return = base_system + personality_to_return
+#     name_to_return = data["name"]
+#     voice_to_return = data["voice"]
+#     base_system = data["system"]
+#     for personality in data.get("personalities"):
+#         if personality.get("personality") == personality_to_load:
+#             personality_to_return = personality.get("system", None)
+#             break
+#         if personality_to_return is None:
+#             personality_to_return = data.get("personalities")[0].get("system", None)
+#     personality_to_return = base_system + personality_to_return
     
-    return name_to_return, voice_to_return, personality_to_return
+#     return name_to_return, voice_to_return, personality_to_return
 
-async def main(input_msg_queue, game_queue, speaking_queue):
-    dabi_name, dabi_voice, dabi_system = load_personality("mythicalmentor")
-    dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
+async def main(input_msg_queue, game_queue, speaking_queue, dabi):
+    print(f"{dabi.bot_name=}")
+    # dabi_name, dabi_voice, dabi_system = OpenAI_Bot.load_personality("mythicalmentor")
+    # dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
 
     # Reminder to self: 
     # Need to have "A" websocket connection or this won't work.
@@ -217,12 +218,12 @@ async def main(input_msg_queue, game_queue, speaking_queue):
         dabi_print("An exception occured:", e)
         traceback.print_exc()
           
-def pre_main(input_msg_queue, game_queue, speaking_queue):
+def pre_main(input_msg_queue, game_queue, speaking_queue, dabi):
     global global_speaking_queue
     global_speaking_queue = speaking_queue
     global global_game_queue
     global_game_queue = game_queue
-    asyncio.run(main(input_msg_queue, game_queue, speaking_queue))
+    asyncio.run(main(input_msg_queue, game_queue, speaking_queue, dabi))
 
 if __name__ == "__main__":
     print("=========================================================")
