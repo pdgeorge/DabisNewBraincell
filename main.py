@@ -10,6 +10,7 @@ import app
 from dotenv import load_dotenv
 import sys
 from dabi_logging import dabi_print
+from bot_openai import OpenAI_Bot, load_personality
 
 # Acronyms:
 # TTT = Text To Text. LLM text transformation, text in, text out.
@@ -37,6 +38,9 @@ async def main():
 
         listen_to_chat = False # Change whether you want Dabi to listen to chat messages or not
 
+        dabi_name, dabi_voice, dabi_system = load_personality("mythicalmentor")
+        dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
+
         # Now legacy, just in case I want to ever later have Dabi with different methods of starting.
         # Potentially, a method of modifying listen_to_chat?
         if len(sys.argv) > 1:
@@ -54,7 +58,7 @@ async def main():
         processes.append(event_process)
 
         # takes in from speaking_queue and speaks through discord
-        discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(input_msg_queue, speaking_queue,))
+        discord_process = multiprocessing.Process(target=discord_bot.start_bot, args=(input_msg_queue, speaking_queue,dabi,))
         processes.append(discord_process)
 
         # receives from other external sources (ML games, etc.)
@@ -67,7 +71,7 @@ async def main():
         
         ### MAIN APP ###
         # Takes in from input_msg_queue and <>, and sends to speaking_queue
-        app_process = multiprocessing.Process(target=app.pre_main, args=(input_msg_queue, game_queue, speaking_queue,))
+        app_process = multiprocessing.Process(target=app.pre_main, args=(input_msg_queue, game_queue, speaking_queue, dabi,))
         processes.append(app_process)
 
         for p in processes:

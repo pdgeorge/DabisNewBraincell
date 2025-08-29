@@ -86,6 +86,27 @@ def normalise_dir(dir):
 async def _inspire_helper(maker):
     maker.run()
     asyncio.run()
+        
+def load_personality(personality_to_load):
+    name_to_return = None
+    voice_to_return = None
+    personality_to_return = None
+    base_system = None
+    with open("system.json", "r") as f:
+        data = json.load(f)
+        
+    name_to_return = data["name"]
+    voice_to_return = data["voice"]
+    base_system = data["system"]
+    for personality in data.get("personalities"):
+        if personality.get("personality") == personality_to_load:
+            personality_to_return = personality.get("system", None)
+            break
+        if personality_to_return is None:
+            personality_to_return = data.get("personalities")[0].get("system", None)
+    personality_to_return = base_system + personality_to_return
+    
+    return name_to_return, voice_to_return, personality_to_return
 
 ########################################################################
 ####################### ALL OF THE TOOLS GO HERE #######################
@@ -577,6 +598,15 @@ class OpenAI_Bot():
                         print("NORMAL WORKED!")
                         print(f"{i}: {device}")
                         return i
+
+    def load_new_personality(self, dabi, personality_to_load):
+        dabi_print("Load_new_personality")
+        dabi_name, dabi_voice, dabi_system = self.load_personality(personality_to_load)
+        dabi.bot_name = dabi_name
+        dabi.voice = dabi_voice
+        dabi.temp_system_message["content"] = dabi_system
+        dabi.reset_memory()
+
 
 async def testing_main():
     test_bot = OpenAI_Bot(DEFAULT_NAME, SYSTEM_MESSAGE)
