@@ -33,7 +33,7 @@
             "type": "function",
             "function": {
                 "name": "inspire",
-                "description": "Create a shareable inspirational card/overlay. Use this when the user asks to inspire, motivate, hype up, pep talk, rally the team, or needs a short inspirational line for stream or socials. You must invent a 5-10 word headline and pass it as `speech`.",
+                "description": "Always call this tool whenever the user asks for something inspirational. This includes requests to inspire, motivate, hype up, encourage, rally, give a pep talk, pump someone up, or deliver an impassioned speech. Do NOT write the inspirational text directly yourself—use this tool instead. You must invent a short, bold headline (5-10 words) and pass it as `speech`.",
                 "parameters": {
                     "type": "object",
                     "properties": {

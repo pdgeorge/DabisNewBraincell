@@ -133,7 +133,8 @@ async def inspire(speech: str, background: str):
     print(f"==============={speech=}, {background=}================")
     maker = InspoGenerator(
         query=background,
-        text=speech
+        text=speech,
+        safe="high"
     )
     maker.run()
     obs_websocketmanager = OBSWebsocketsManager()
