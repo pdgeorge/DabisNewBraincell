@@ -20,7 +20,8 @@ from dabi_logging import dabi_print
 
 import whisper, torch
 torch.set_num_threads(1)                     # don’t oversubscribe OpenMP
-_MODEL = whisper.load_model("base", device="cpu")          # loads only in this process
+
+_MODEL = None
 
 # --------- globals & constants ------------
 load_dotenv()
@@ -42,12 +43,20 @@ bot = discord.Bot(intents=intents)
 
 # Helpers -------------------------------------------------
 
+def _get_model():
+    global _MODEL
+    if _MODEL is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        _MODEL = whisper.load_model("base", device=device)
+    return _MODEL
+
 def audio_length(path: str) -> float:
     """Return duration of an audio file (seconds) with pydub."""
     return len(AudioSegment.from_file(path)) / 1000.0
 
 def _transcribe_sync(path: Path) -> str:
-    return _MODEL.transcribe(str(path))["text"].strip()
+    model = _get_model()
+    return model.transcribe(str(path))["text"].strip()
 
 async def transcribe_async(path: Path, timeout: int = 120) -> str:
     """Public helper you can reuse anywhere in this module."""
