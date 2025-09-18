@@ -389,8 +389,11 @@ def build_app() -> FastAPI:
             return {"status": "ok", **result}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to post image: {e}")
-    
+
+    # All new posts need to be before this
     return app
+
+
 
 def start_receiving_in_thread():
     t = threading.Thread(target=lambda: uvicorn.run(build_app(), host="127.0.0.1", port=8002, log_level="info"), daemon=True)

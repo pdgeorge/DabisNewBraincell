@@ -139,6 +139,7 @@ async def inspire(speech: str, background: str):
     maker.run()
     obs_websocketmanager = OBSWebsocketsManager()
     await obs_websocketmanager.temp_display("DabiSpirations", 15)
+    return speech
     
 
 async def send_right_paddle(val: int):
