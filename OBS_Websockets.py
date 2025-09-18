@@ -12,7 +12,7 @@ OBS_PASSWORD = os.getenv("OBS_PASSWORD")
 
 class OBSWebsocketsManager():
     def __init__(self) -> None:
-        self.ws = obsws("192.168.0.65", 4455, OBS_PASSWORD)
+        self.ws = obsws("192.168.30.1", 4455, OBS_PASSWORD)
         self.ws.connect()
     
     def get_item_id(self, scene_name, element_name):
