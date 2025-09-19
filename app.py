@@ -12,7 +12,7 @@ import sqlite3
 import numpy as np
 from pydub import AudioSegment
 from dabi_logging import dabi_print
-
+import demoji
 import traceback
 
 from bot_openai import OpenAI_Bot
@@ -33,6 +33,12 @@ global_game_queue = None
 read_chat_flag = False
 last_msg_time = None
 chat_messages = []
+
+def remove_emoji(text):
+    found = demoji.findall(text)
+    for item in found.keys():
+        text = text.replace(item, "")
+    return text
 
 async def db_insert(table_name, username, message, response):
     # Connect to the db. If it doesn't exist it will be created.
@@ -136,6 +142,8 @@ async def speak_message(message, dabi):
         response = await dabi.send_img(send_to_dabi_img, send_to_dabi_msg)
 
     dabi_print(f"{response=}")
+
+    response = remove_emoji(response)
     
     voice_path, voice_duration = dabi.create_se_voice(dabi.se_voice, response)
     
