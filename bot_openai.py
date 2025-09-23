@@ -78,6 +78,14 @@ ERROR_MSG = {
     "total_tokens": 36
   }}
 
+def _dump_response(resp):
+    # Normalize to a dict no matter what we got back
+    if hasattr(resp, "model_dump"):
+        return resp.model_dump()
+    if hasattr(resp, "to_dict"):
+        return resp.to_dict()
+    return resp  # assume it's already a dict
+
 def normalise_dir(dir):
     current_dir = os.getcwd()
     normalised_dir = os.path.normpath(os.path.join(current_dir, dir))
@@ -296,83 +304,97 @@ class OpenAI_Bot():
         tool_calls = None
         self.chat_history.append(self.chat_message)
         try:
-            response = await client.chat.completions.create(
+            raw = await client.chat.completions.create(
                 model=MODEL,
                 messages=self.chat_history,
                 temperature=0.6,
                 max_tokens=100,
                 tools=self.tools,
-                tool_choice="auto"
+                tool_choice="auto",
             )
+            # Work with the SDK object for tool_calls, then dump to dict
+            response_obj = raw
+            response = _dump_response(raw)
 
-            response_message = response.choices[0].message
-            tool_calls = response_message.tool_calls
-            try:
-                if tool_calls:
+            # ----- handle tool calls (using the object for convenience) -----
+            response_message = response_obj.choices[0].message
+            tool_calls = getattr(response_message, "tool_calls", None)
+
+            if tool_calls:
+                # append assistant turn that requested tools
+                self.chat_history.append({
+                    "role": "assistant",
+                    "content": response_message.content,  # may be None; that's fine
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                        }
+                        for tc in tool_calls
+                    ],
+                })
+
+                # Execute tools
+                for tc in tool_calls:
+                    try:
+                        args = json.loads(tc.function.arguments or "{}")
+                    except Exception as e:
+                        raise ValueError(f"Bad tool args for {tc.function.name}: {tc.function.arguments}") from e
+
+                    # Make sure the tool exists
+                    if tc.function.name not in globals():
+                        raise NameError(f"Tool '{tc.function.name}' not found")
+
+                    result = await globals()[tc.function.name](**args)
                     self.chat_history.append({
-                        "role": "assistant",
-                        "content": response_message.content,
-                        "tool_calls": [
-                            {
-                                "id": tc.id,
-                                "function": {
-                                    "name": tc.function.name,
-                                    "arguments": tc.function.arguments
-                                },
-                                "type": "function"
-                            }
-                            for tc in tool_calls
-                        ]
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": json.dumps(result),
                     })
-                    
-                    print("===============================================")
-                    dabi_print(f"Tool call: {self.chat_history[-1]=}")
-                    print("===============================================")
 
-                    for tool_call in tool_calls:
-                        args = json.loads(tool_call.function.arguments)
+                # Follow-up completion after tool results
+                final_raw = await client.chat.completions.create(
+                    model=MODEL,
+                    messages=self.chat_history,
+                )
+                response = _dump_response(final_raw)
 
-                        result = await globals()[tool_call.function.name](**args)
-
-                        self.chat_history.append({
-                            "role": "tool",
-                            "content": json.dumps(result),
-                            "tool_call_id": tool_call.id
-                        })
-                    final_response = await client.chat.completions.create(
-                        model=MODEL,
-                        messages=self.chat_history
-                    )
-                    response = final_response
-                else:
-                    response = response
-            except Exception as e:
-                print("281")
-                print_error(e)
-                response = ERROR_MSG
-                response["choices"][0]["message"] = {'role': 'assistant', 'content': 'Sorry, there was an exception. '+str(e)}
-                self.reset_memory()
         except Exception as e:
-            print("287")
+            print("send_to_llm exception")
             print_error(e)
-            response = ERROR_MSG
-            response["choices"][0]["message"] = {'role': 'assistant', 'content': 'Sorry, there was an exception. '+str(e)}
+            response = ERROR_MSG  # already a dict
+            response["choices"][0]["message"] = {
+                "role": "assistant",
+                "content": f"Sorry, there was an exception. {e}",
+            }
             self.reset_memory()
 
-        bot_response = {}
-        bot_response["role"] = response.choices[0].message.role
-        bot_response["content"] = response.choices[0].message.content
+        # ----- from here on: ALWAYS treat response as dict -----
+        choices = response.get("choices", [])
+        if not choices:
+            # ultra-defensive fallback
+            choices = [{"message": {"role": "assistant", "content": ""}}]
+
+        message = choices[0].get("message", {})
+        role = message.get("role", "assistant")
+        content = message.get("content") or ""  # tool-call first turn may have no content
+
+        bot_response = {"role": role, "content": content}
         self.chat_history.append(bot_response)
 
-        dabi_print(f"{bot_response=}")
-        if response.usage.total_tokens > 135000:
-            del self.chat_history[1]
-            del self.chat_history[1]
-            del self.chat_history[1]
+        # usage may be missing on ERROR_MSG; guard it
+        usage = response.get("usage") or {}
+        total_tokens = usage.get("total_tokens", 0)
+        if total_tokens and total_tokens > 135000:
+            # trim but keep system at index 0
+            del self.chat_history[1:4]
 
         self.save_json_to_file(self.chat_history, self.bot_file)
-
-        return response.choices[0].message.content
+        return content
     
     def reset_memory(self):
         self.chat_history = []
