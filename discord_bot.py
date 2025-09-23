@@ -416,4 +416,4 @@ if __name__ == "__main__":
     discord_dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
     input_msg_queue = multiprocessing.Queue()
     speaking_queue = multiprocessing.Queue()
-    start_bot(input_msg_queue, speaking_queue)
+    start_bot(input_msg_queue, speaking_queue, discord_dabi)
