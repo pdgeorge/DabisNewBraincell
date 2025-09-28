@@ -46,7 +46,9 @@ class TW():
         return response.json()
 
     def get_moderators_formatted(self):
+        print(f"get_moderators_formatted")
         response = self.get_moderators()
+        print(f"get_moderators_formatted: {response=}")
         response.get('data',{})
 
         user_names = [user['user_name'].lower() for user in response['data']]
@@ -61,7 +63,7 @@ class TW():
             'Client-Id': CLIENT_ID,
             'Content-Type': 'application/json'
         }
-
+        print("get_moderators")
         response = requests.get(url, headers=headers)
 
         return response.json()
@@ -162,7 +164,7 @@ class TW():
 
     def play_ads(self, length: int = 30) -> dict:
         """
-        Start a commercial break on the broadcaster’s channel.
+        Start a commercial break on the broadcaster's channel.
 
         Parameters
         ----------
