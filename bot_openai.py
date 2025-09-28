@@ -95,10 +95,9 @@ async def _inspire_helper(maker):
     maker.run()
     asyncio.run()
         
-def load_personality(personality_to_load):
+def load_personality():
     name_to_return = None
     voice_to_return = None
-    personality_to_return = None
     base_system = None
     with open("system.json", "r") as f:
         data = json.load(f)
@@ -106,15 +105,8 @@ def load_personality(personality_to_load):
     name_to_return = data["name"]
     voice_to_return = data["voice"]
     base_system = data["system"]
-    for personality in data.get("personalities"):
-        if personality.get("personality") == personality_to_load:
-            personality_to_return = personality.get("system", None)
-            break
-        if personality_to_return is None:
-            personality_to_return = data.get("personalities")[0].get("system", None)
-    personality_to_return = base_system + personality_to_return
     
-    return name_to_return, voice_to_return, personality_to_return
+    return name_to_return, voice_to_return, base_system
 
 ########################################################################
 ####################### ALL OF THE TOOLS GO HERE #######################
@@ -535,7 +527,7 @@ class OpenAI_Bot():
         return opus_file_path, opus_duration
 
     async def playHT_wav_generator(self, to_generate):
-        client = Client(
+        playht_client = Client(
             user_id=PLAYHT_USER_ID,
             api_key=PLAYHT_API_KEY,
         )
@@ -543,7 +535,7 @@ class OpenAI_Bot():
         try:
             options = TTSOptions(voice=self.voice)
             omega_chunk = b''
-            for i, chunk in enumerate(client.tts(to_generate, options)):
+            for i, chunk in enumerate(playht_client.tts(to_generate, options)):
                 if i == 0:
                     continue
                 omega_chunk += chunk
@@ -561,8 +553,8 @@ class OpenAI_Bot():
             print("Received from opus: " + filepath)
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
-            client.close()
-        client.close()
+            playht_client.close()
+        playht_client.close()
         print(filepath)
         return filepath, file_length
 

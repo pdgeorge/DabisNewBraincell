@@ -38,7 +38,7 @@ async def main():
 
         listen_to_chat = False # Change whether you want Dabi to listen to chat messages or not
 
-        dabi_name, dabi_voice, dabi_system = load_personality("mythicalmentor")
+        dabi_name, dabi_voice, dabi_system = load_personality()
         dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
 
         # Now legacy, just in case I want to ever later have Dabi with different methods of starting.
