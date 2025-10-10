@@ -8,7 +8,11 @@ from dotenv import load_dotenv
 from dabi_logging import dabi_print
 from datetime import datetime
 
+from event_bus import EventBus
+
 load_dotenv()
+
+_event_bus = EventBus()
 
 followers = None
 global_input_msg_queue = None
@@ -24,6 +28,24 @@ time_to_read_chat = 60
 # ACCESS_TOKEN = os.getenv('DABI_ACCESS_TOKEN')   # Generated from your authentication mechanism, make sure it is scoped properly
 CHANNEL_ID = os.getenv('PDGEORGE_CHANNEL_ID')   # The channel ID of the channel you want to join
 CLIENT_ID = os.getenv('DABI_CLIENT_ID')         # The same Client ID used to generate the access token
+
+async def _ensure_bus():
+    print("ensuring_bus")
+    await _event_bus.connect()
+
+async def _startup():
+    try:
+        await _ensure_bus()
+    except Exception as e:
+        print("[twitch_events] RabbitMQ connect failed (continuing with Queues):", e)
+
+async def publish_event(key, in_data):
+    await _event_bus.publish(
+        routing_key = key,      # label used by consumers
+        type_ = "reward.redeemed.v1",     # event type
+        data = in_data,
+        source = "dabi.twitch_events"     # who produced this event
+    )
 
 async def collect_messages(message):
     if message.get("msg_msg", "")[0] == "!":
@@ -159,12 +181,16 @@ async def handle_redemptions(event):
             to_send = await extract_message_to_send_points(event)
             dabi_print(f"{to_send=}")
             global_input_msg_queue.put(json.dumps(to_send))
+            key = "redeem.talk"
+            await publish_event(key, to_send)
         case "InspireMe":
             formatted_received = await extract_message_to_send_points(event)
             dabi_print(formatted_received)
             temp_send = f"Inspire {formatted_received.get('msg_username', '')} Dabi! On the topic of {formatted_received.get('msg_msg', '')}"
             formatted_received["formatted_msg"] = f"twitch:{formatted_received.get('msg_username', '')}: {temp_send}"
             global_input_msg_queue.put(json.dumps(formatted_received))
+            key = "redeem.inspire"
+            await publish_event(key, formatted_received)
         case "brb":
             if global_chat_mode:
                 global_chat_mode = False
@@ -175,6 +201,8 @@ async def handle_redemptions(event):
                     "formatted_msg": "twitch:pdgeorge: Ok, I'm back. Thanks for looking after chat."
                 }
                 global_input_msg_queue.put(json.dumps(brb_msg))
+                key = "redeem.brb"
+                await publish_event(key, brb_msg)
             else:
                 global_chat_mode = True
                 brb_msg = {
@@ -184,6 +212,23 @@ async def handle_redemptions(event):
                     "formatted_msg": "twitch:pdgeorge: Can you look after chat while I'm away? Thanks bro."
                 }
                 global_input_msg_queue.put(json.dumps(brb_msg))
+                key = "redeem.brb"
+                await publish_event(key, brb_msg)
+        case "general_test":
+            await general_test(event)
+
+async def general_test(event):
+    print("general_test")
+    print(f"{event=}")
+    await _ensure_bus()
+    publish_data={
+        "reward_title": event.get('payload', {}).get('event', {}).get('reward', {}).get('title', {}),
+        "reward_id": event.get('payload', {}).get('event', {}).get('reward', {}).get('id', {'ID_FAILED'}),
+        "user": event.get('payload', {}).get('event', {}).get('user_name', {}),
+        "cost": event.get('payload', {}).get('event', {}).get('reward', {}).get('cost', {'COST'})
+    }
+    key = "redeem.test"
+    await publish_event(key, publish_data)
 
 async def timeout_user(msg):
     formatted_return = None
@@ -381,6 +426,7 @@ async def grab_followers():
 async def main():
     global followers
     # run here once
+    await _startup()
     followers = await grab_followers()
 
     await asyncio.gather(ws_conn())

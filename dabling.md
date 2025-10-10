@@ -1,7 +1,7 @@
 # Dablings
 ## MVP
 * Decouple twitch_event.py from queues
-  * Move towards... File? Redis DB?
+  * Move towards... File? Redis DB? Event bus? RabbitMQ?
 * Channel point redeem for TTS from chat
   * Channel point redeem will cause message to be read out aloud
   * Static Dabling will pop up and 'read' out the TTS then drop back down
