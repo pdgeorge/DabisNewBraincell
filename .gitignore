@@ -2,6 +2,9 @@ snake_play/
 breakout_play/
 model/
 
+# Temp files
+*~
+
 # Specific files
 test*
 *.mp3
