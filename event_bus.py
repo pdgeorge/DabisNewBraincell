@@ -7,6 +7,39 @@ AMQP_URL = os.getenv("AMQP_URL", "amqp://guest:guest@localhost/")
 EXCHANGE_NAME = os.getenv("EXCHANGE_NAME", "dabi.events")
 DLX_NAME = os.getenv("DLX_NAME", "dabi.dlx")
 
+import asyncio
+import subprocess
+
+async def ensure_broker():
+    try:
+        print("Waiting for broker connection...")
+        bus = EventBus()
+        await bus.connect()
+        return bus
+    except Exception:
+        print("RabbitMQ not running — starting via Docker Compose...")
+        subprocess.run(["docker", "compose", "up", "-d", "rabbitmq"], check=False)
+
+        # Wait for RabbitMQ container to become healthy
+        for _ in range(30):  # ~30 × 2s = 60s max wait
+            status = subprocess.run(
+                ["docker", "inspect", "-f", "{{.State.Health.Status}}", "rabbitmq"],
+                capture_output=True,
+                text=True
+            )
+            if "healthy" in status.stdout:
+                print("RabbitMQ is healthy.")
+                break
+            print("Waiting for RabbitMQ to become healthy...")
+            await asyncio.sleep(2)
+        else:
+            raise TimeoutError("RabbitMQ failed to reach healthy state in time.")
+
+        # Once healthy, connect to the event bus
+        bus = EventBus()
+        await bus.connect()
+        return bus
+
 class EventBus:
     def __init__(self):
         self._conn = None

@@ -1,20 +1,9 @@
 import asyncio, json, os, subprocess, sys
-from event_bus import EventBus  # uses env vars internally
+from time import sleep
+from event_bus import EventBus, ensure_broker
 
 AMQP_URL = os.getenv("AMQP_URL", "amqp://guest:guest@localhost/")
 ALLOW_AUTO = os.getenv("ALLOW_DOCKER_AUTOSTART", "0") == "1"
-
-async def ensure_broker():
-    try:
-        print("waiting for broker?")
-        bus = EventBus()
-        await bus.connect()
-        return bus
-    except:
-        print("docker compose uppies")
-        subprocess.run(["docker", "compose", "up", "-d", "rabbitmq"], check=False)
-
-    raise TimeoutError("RabbitMQ failed to start in time.")
 
 def print_event(evt: dict):
     # Envelope
@@ -53,9 +42,13 @@ def test_routing(evt, rk):
     if rk == "redeem.talk":
         print("rk: redeem.talk")
         print_event(evt)
+    
+    else:
+        print("OOPS")
+        print_event(evt)
 
 async def run():
-    
+    sleep(3)
     bus = await ensure_broker()
 
     q = await bus.bind_queue(queue_name="background", pattern="#") # Will do ALL redeems

@@ -14,8 +14,7 @@ from pydub import AudioSegment
 from dabi_logging import dabi_print
 import demoji
 import traceback
-
-from bot_openai import OpenAI_Bot
+from event_bus import EventBus, ensure_broker
 
 TEMPLATE = {
     "type": "updateMouth",
@@ -25,8 +24,6 @@ TEMPLATE = {
 }
 
 TIME_BETWEEN_SPEAKS = 10
-
-CABLE_A_OUTPUT = 26 # This was found using dabi.scan_audio_devices()
 
 global_speaking_queue = None
 global_game_queue = None
@@ -118,28 +115,33 @@ async def speak_message(message, dabi):
     discord_prefix = "discord:"
     message_prefix = "message:"
     react_prefix = "react:"
-    if message["formatted_msg"].startswith(twitch_prefix):
-        send_to_dabi = message["formatted_msg"][len(twitch_prefix):]
+    if message.get("formatted_msg", "").startswith(twitch_prefix):
+        send_to_dabi = message.get("formatted_msg", "")[len(twitch_prefix):]
         response = await dabi.send_msg(send_to_dabi)
-    if message["formatted_msg"].startswith(game_prefix):
-        send_to_dabi = message["formatted_msg"][len(game_prefix):]
+    if message.get("formatted_msg", "").startswith(game_prefix):
+        send_to_dabi = message.get("formatted_msg", "")[len(game_prefix):]
         response = await dabi.send_msg(send_to_dabi)
-    if message["formatted_msg"].startswith(website_prefix):
-        send_to_dabi = message["formatted_msg"][len(website_prefix):]
+    if message.get("formatted_msg", "").startswith(website_prefix):
+        send_to_dabi = message.get("formatted_msg", "")[len(website_prefix):]
         response = await dabi.send_msg(send_to_dabi)
-    if message["formatted_msg"].startswith(discord_prefix):
-        send_to_dabi = message["formatted_msg"][len(discord_prefix):]
+    if message.get("formatted_msg", "").startswith(discord_prefix):
+        send_to_dabi = message.get("formatted_msg", "")[len(discord_prefix):]
         response = await dabi.send_msg(send_to_dabi)
-    if message["formatted_msg"].startswith(action_prefix):
-        send_to_dabi = await choose_action(message["formatted_msg"][len(action_prefix):], dabi)
+    if message.get("formatted_msg", "").startswith(action_prefix):
+        send_to_dabi = await choose_action(message.get("formatted_msg", "")[len(action_prefix):], dabi)
         response = await dabi.send_msg(send_to_dabi)
-    if message["formatted_msg"].startswith(message_prefix) and read_chat_flag:
-        send_to_dabi = message["formatted_msg"][len(message_prefix):]
+    if message.get("formatted_msg", "").startswith(message_prefix) and read_chat_flag:
+        send_to_dabi = message.get("formatted_msg", "")[len(message_prefix):]
         response = await dabi.send_msg(send_to_dabi)
-    if message["formatted_msg"].startswith(react_prefix):
+    if message.get("formatted_msg", "").startswith(react_prefix):
         send_to_dabi_img = message["file_name"]
-        send_to_dabi_msg = message["formatted_msg"][len(react_prefix):]
+        send_to_dabi_msg = message.get("formatted_msg", "")[len(react_prefix):]
         response = await dabi.send_img(send_to_dabi_img, send_to_dabi_msg)
+    else:
+        print("Bro, we couldn't find anything.")
+        print("Are you testing something?")
+        print(f"Either way, here's the\nmessage\n===\n{message=}\n===\nthat we started with")
+        response = "We're testing stuff here"
 
     dabi_print(f"{response=}")
 
@@ -155,74 +157,49 @@ async def speak_message(message, dabi):
     to_send = json.dumps(to_send)
     return to_send, voice_path, voice_duration
 
-async def send_msg_helper(queue, websocket, dabi, speaking_queue):
+async def send_msg(queue, dabi, speaking_queue, event):
+    """Process one event and speak it."""
     to_send = None
-    message = queue.get()
+
+    message = event.get("data", {})
+    print(f"\n\napp.py 162?")
+    print(f"{message=}\n")
     
-    message = json.loads(message)
+    print(f"{message=}")
+    print(f"{type(message)=}")
+    if isinstance(message, str):
+        try:
+            message = json.loads(message)
+        except Exception as e:
+            print("Bas JSON event:", e, message)
+
     # message = check_for_command(message, dabi)
     to_send, voice_path, voice_duration = await speak_message(message, dabi)
-    
-    # websockets.broadcast(websockets=CLIENTS, message=to_send)
-    await websocket.send(to_send)
     
     # dabi.read_message_choose_device_mp3(voice_path, CABLE_A_OUTPUT)
     speaking_queue.put(voice_path)
     await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
 
-async def send_msg(websocket, path, dabi, input_msg_queue, game_queue, speaking_queue):
-    if input_msg_queue.qsize() > 0:
-        await send_msg_helper(queue=input_msg_queue, websocket=websocket, dabi=dabi, speaking_queue=speaking_queue)
-    if game_queue.qsize() > 0:
-        await send_msg_helper(queue=game_queue, websocket=websocket, dabi=dabi, speaking_queue=speaking_queue)
-        
-
-# def load_new_personality(dabi, personality_to_load):
-#     dabi_print("Load_new_personality")
-#     dabi_name, dabi_voice, dabi_system = load_personality(personality_to_load)
-#     dabi.bot_name = dabi_name
-#     dabi.voice = dabi_voice
-#     dabi.temp_system_message["content"] = dabi_system
-#     dabi.reset_memory()
-    
-
-# def load_personality(personality_to_load):
-#     name_to_return = None
-#     voice_to_return = None
-#     personality_to_return = None
-#     base_system = None
-#     with open("system.json", "r") as f:
-#         data = json.load(f)
-        
-#     name_to_return = data["name"]
-#     voice_to_return = data["voice"]
-#     base_system = data["system"]
-#     for personality in data.get("personalities"):
-#         if personality.get("personality") == personality_to_load:
-#             personality_to_return = personality.get("system", None)
-#             break
-#         if personality_to_return is None:
-#             personality_to_return = data.get("personalities")[0].get("system", None)
-#     personality_to_return = base_system + personality_to_return
-    
-#     return name_to_return, voice_to_return, personality_to_return
-
 async def main(input_msg_queue, game_queue, speaking_queue, dabi):
     print(f"{dabi.bot_name=}")
-    # dabi_name, dabi_voice, dabi_system = OpenAI_Bot.load_personality("mythicalmentor")
-    # dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
+    bus = await ensure_broker()
+    q = await bus.bind_queue(queue_name="app", pattern="#") # Will do ALL redeems
+    print(f"Connected")
 
-    # Reminder to self: 
-    # Need to have "A" websocket connection or this won't work.
-    async def handler(websocket, path):
-        await send_msg(websocket, path, dabi, input_msg_queue, game_queue, speaking_queue)
-    
     try:
-        async with websockets.serve(handler, "localhost", 8001):
-            await asyncio.Future()
+        async with q.iterator() as it:
+            async for msg in it:
+                try:
+                    event = json.loads(msg.body)
+                    print(f"{event=}")
+                except Exception as e:
+                    print("Bas JSON event:", e, msg.body)
+                    continue
+
+                print(f"\n194\n{event=}\n")
+                await send_msg(queue=input_msg_queue, dabi=dabi, speaking_queue=speaking_queue, event=event)
+
     except Exception as e:
-        # error_msg = "./error.mp3"
-        # dabi.read_message_choose_device_mp3(error_msg, CABLE_A_OUTPUT)
         dabi_print("An exception occured:", e)
         traceback.print_exc()
           
@@ -233,8 +210,15 @@ def pre_main(input_msg_queue, game_queue, speaking_queue, dabi):
     global_game_queue = game_queue
     asyncio.run(main(input_msg_queue, game_queue, speaking_queue, dabi))
 
+def pre_pre_main():
+    from bot_openai import OpenAI_Bot, load_personality
+    dabi_name, dabi_voice, dabi_system = load_personality()
+    dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
+    pre_main(None, None, None, dabi)
+
 if __name__ == "__main__":
     print("=========================================================")
     print("Do not run this solo any more.\nRun this through main.py")
     print("=========================================================")
-    exit(0)
+    # exit(0)
+    pre_pre_main()
