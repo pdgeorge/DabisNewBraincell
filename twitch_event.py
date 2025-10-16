@@ -85,6 +85,8 @@ async def handle_twitch_msg(event):
     to_send = await collect_messages(to_send)
     if to_send is not None:
         global_input_msg_queue.put(json.dumps(to_send))
+        key = "twitch.msg"
+        await publish_event(key, to_send)
 
 async def extract_message_to_send_chat(event):
     formatted_msg = None
@@ -104,11 +106,26 @@ async def extract_message_to_send_chat(event):
     
     return formatted_return
 
+async def handle_follow(event):
+    followers.append(event.get('payload', {}).get('event', {}).get('user_login', {}))
+    follow_to_send = {
+        "msg_user": event.get('payload', {}).get('event', {}).get('user_login', {}),
+        "msg_server": event.get('payload', {}).get('event', {}).get('broadcaster_user_login', {}),
+        "msg_msg": "Has just followed!",
+        "formatted_msg": f"twitch:{event.get('payload', {}).get('event', {}).get('user_login', {})}: Has just followed!"
+    }
+    global_input_msg_queue.put(json.dumps(follow_to_send))
+    dabi_print(json.dumps(follow_to_send))
+    key = "twitch.follow"
+    await publish_event(key, follow_to_send)
+
 async def handle_sub(event):
     global global_input_msg_queue
 
     to_send = await extract_message_to_sub(event)
     global_input_msg_queue.put(json.dumps(to_send))
+    key = "twitch.sub"
+    await publish_event(key, to_send)
 
 async def extract_message_to_sub(event):
     formatted_msg = None
@@ -152,6 +169,8 @@ async def handle_bits(event):
             }
     
     global_input_msg_queue.put(json.dumps(formatted_return))
+    key = "twitch.bits"
+    await publish_event(key, formatted_return)
 
 async def handle_raid(event):
     formatted_msg = None
@@ -171,6 +190,8 @@ async def handle_raid(event):
             }
     
     global_input_msg_queue.put(json.dumps(formatted_return))
+    key = "twitch.raid"
+    await publish_event(key, formatted_return)
 
 async def handle_redemptions(event):
     global global_input_msg_queue
@@ -181,7 +202,7 @@ async def handle_redemptions(event):
             to_send = await extract_message_to_send_points(event)
             dabi_print(f"{to_send=}")
             global_input_msg_queue.put(json.dumps(to_send))
-            key = "redeem.talk"
+            key = "twitch.talk"
             await publish_event(key, to_send)
         case "InspireMe":
             formatted_received = await extract_message_to_send_points(event)
@@ -189,7 +210,7 @@ async def handle_redemptions(event):
             temp_send = f"Inspire {formatted_received.get('msg_username', '')} Dabi! On the topic of {formatted_received.get('msg_msg', '')}"
             formatted_received["formatted_msg"] = f"twitch:{formatted_received.get('msg_username', '')}: {temp_send}"
             global_input_msg_queue.put(json.dumps(formatted_received))
-            key = "redeem.inspire"
+            key = "twitch.inspire"
             await publish_event(key, formatted_received)
         case "brb":
             if global_chat_mode:
@@ -201,7 +222,7 @@ async def handle_redemptions(event):
                     "formatted_msg": "twitch:pdgeorge: Ok, I'm back. Thanks for looking after chat."
                 }
                 global_input_msg_queue.put(json.dumps(brb_msg))
-                key = "redeem.brb"
+                key = "twitch.brb"
                 await publish_event(key, brb_msg)
             else:
                 global_chat_mode = True
@@ -212,7 +233,7 @@ async def handle_redemptions(event):
                     "formatted_msg": "twitch:pdgeorge: Can you look after chat while I'm away? Thanks bro."
                 }
                 global_input_msg_queue.put(json.dumps(brb_msg))
-                key = "redeem.brb"
+                key = "twitch.brb"
                 await publish_event(key, brb_msg)
         case "general_test":
             await general_test(event)
@@ -352,15 +373,7 @@ async def on_message(ws, message):
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.follow':
         # print(f'[🔔] Event:\n{event}')
         if event.get('payload', {}).get('event', {}).get('user_login', {}) not in followers:
-            followers.append(event.get('payload', {}).get('event', {}).get('user_login', {}))
-            follow_to_send = {
-                "msg_user": event.get('payload', {}).get('event', {}).get('user_login', {}),
-                "msg_server": event.get('payload', {}).get('event', {}).get('broadcaster_user_login', {}),
-                "msg_msg": "Has just followed!",
-                "formatted_msg": f"twitch:{event.get('payload', {}).get('event', {}).get('user_login', {})}: Has just followed!"
-            }
-            global_input_msg_queue.put(json.dumps(follow_to_send))
-            dabi_print(json.dumps(follow_to_send))
+            await handle_follow(event)
     elif event.get('metadata', {}).get('message_type', {}) == 'notification' and event.get('metadata', {}).get('subscription_type', {}) == 'channel.channel_points_custom_reward_redemption.add':
         dabi_print(event)
         await handle_redemptions(event)
