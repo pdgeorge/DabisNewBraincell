@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from urllib.parse import urlparse
 from urllib.request import urlopen
 from dabi_logging import dabi_print
+from event_bus import EventBus, ensure_broker
 
 import whisper, torch
 torch.set_num_threads(1)                     # don’t oversubscribe OpenMP
@@ -40,6 +41,7 @@ intents.message_content = True
 intents.voice_states = True
 
 bot = discord.Bot(intents=intents)
+_bus = EventBus
 
 # Helpers -------------------------------------------------
 
@@ -167,7 +169,7 @@ global_input_msg_queue = None
 global_speaking_queue = None
 listening_flag = False
 
-@tasks.loop(seconds=60)
+@tasks.loop(seconds=20)
 async def voice_keepalive():
     for vc in bot.voice_clients:
         if vc.is_connected():
@@ -227,39 +229,50 @@ async def test(ctx: discord.ApplicationContext):
 @bot.slash_command(name="listen", description="Play back items from the speaking queue")
 @commands.has_any_role(*PRIVILEGED_ROLES)
 async def listen(ctx: discord.ApplicationContext):
-    global listening_flag
+    global listening_flag, _bus
     voice = ctx.author.voice
+    _bus = await ensure_broker()
+    q = await _bus.bind_queue(queue_name="discord", pattern="discord.path") # Will do ALL redeems of discord.<below>
     if not voice:
         return await ctx.respond("You aren't in a voice channel!")
 
     await ctx.respond(f"🎧 Listening … (voice channel **{voice.channel.name}**)")
 
     vc = ctx.guild.voice_client or await voice.channel.connect()
+    await asyncio.sleep(0.5)
+    vc.send_audio_packet(b'\xF8\xFF\xFE', encode=False)
     connections[ctx.guild.id] = vc
 
     try:
         while True:
             if vc.is_playing():
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.1)
                 continue
 
-            if global_speaking_queue and global_speaking_queue.qsize() > 0:
-                temp_flag = listening_flag
-                if listening_flag:
-                    listening_flag = False
-                to_play = global_speaking_queue.get()
-                vc.stop()
-                vc.play(discord.FFmpegPCMAudio(to_play))
-                delay = audio_length(to_play) + 0.5
-                dabi_print(f"Playing {to_play} ({delay:.1f}s)")
-                await asyncio.sleep(delay)
-                if temp_flag:
-                    listening_flag = temp_flag
-                temp_flag = False
-                try:
-                    os.remove(to_play)
-                except OSError:
-                    pass
+            try:
+                message = await asyncio.wait_for(q.get(), timeout=0.25)
+                await message.ack()
+            except asyncio.TimeoutError:
+                # No message here, just looping.
+                continue
+            to_play = message.body.decode("utf-8")
+            print("discord_bot.py")
+            print(f"\n=====\n{to_play=}\n=====\n")
+            temp_flag = listening_flag
+            if listening_flag:
+                listening_flag = False
+            vc.stop()
+            vc.play(discord.FFmpegPCMAudio(to_play))
+            delay = audio_length(to_play) + 0.5
+            dabi_print(f"Playing {to_play} ({delay:.1f}s)")
+            await asyncio.sleep(delay)
+            if temp_flag:
+                listening_flag = temp_flag
+            temp_flag = False
+            try:
+                os.remove(to_play)
+            except OSError:
+                pass
             if listening_flag:
                 print(f"{listening_flag=}")
                 await do_transcribe(ctx=ctx, seconds=DEFAULT_RECORD)
@@ -392,8 +405,6 @@ def build_app() -> FastAPI:
 
     # All new posts need to be before this
     return app
-
-
 
 def start_receiving_in_thread():
     t = threading.Thread(target=lambda: uvicorn.run(build_app(), host="127.0.0.1", port=8002, log_level="info"), daemon=True)

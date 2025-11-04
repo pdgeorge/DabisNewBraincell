@@ -10,6 +10,25 @@ DLX_NAME = os.getenv("DLX_NAME", "dabi.dlx")
 import asyncio
 import subprocess
 
+def strip_invisible_characters(text):
+    """Remove non-printable characters while keeping standard whitespace."""
+    if not isinstance(text, str):
+        return text
+    allowed_whitespace = {"\n", "\r", "\t"}
+    return "".join(ch for ch in text if ch.isprintable() or ch in allowed_whitespace)
+
+def sanitize_formatted_message(message):
+    """Strip invisible control characters that RabbitMQ can add to formatted_msg."""
+    if not isinstance(message, dict):
+        return message
+    formatted_msg = message.get("formatted_msg")
+    if isinstance(formatted_msg, str):
+        cleaned_msg = strip_invisible_characters(formatted_msg)
+        if cleaned_msg != formatted_msg:
+            message = dict(message)
+            message["formatted_msg"] = cleaned_msg
+    return message
+
 async def ensure_broker():
     try:
         print("Waiting for broker connection...")

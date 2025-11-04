@@ -14,7 +14,7 @@ from pydub import AudioSegment
 from dabi_logging import dabi_print
 import demoji
 import traceback
-from event_bus import EventBus, ensure_broker
+from event_bus import EventBus, ensure_broker, sanitize_formatted_message
 
 TEMPLATE = {
     "type": "updateMouth",
@@ -29,6 +29,7 @@ global_speaking_queue = None
 global_game_queue = None
 read_chat_flag = False
 last_msg_time = None
+bus = None
 chat_messages = []
 
 def remove_emoji(text):
@@ -36,6 +37,14 @@ def remove_emoji(text):
     for item in found.keys():
         text = text.replace(item, "")
     return text
+
+async def publish_event(key, in_data):
+    await bus.publish(
+        routing_key = key,      # label used by consumers
+        type_ = "reward.redeemed.v1",     # event type
+        data = in_data,
+        source = "dabi.twitch_events"     # who produced this event
+    )
 
 async def db_insert(table_name, username, message, response):
     # Connect to the db. If it doesn't exist it will be created.
@@ -105,6 +114,7 @@ async def choose_action(msg, dabi):
 # Takes in the message received from twitch_connector
 # Removes "twitch:" and "speaks" the message
 async def speak_message(message, dabi):
+    message = sanitize_formatted_message(message)
     to_send = None
     response = ""
     
@@ -116,24 +126,30 @@ async def speak_message(message, dabi):
     message_prefix = "message:"
     react_prefix = "react:"
     if message.get("formatted_msg", "").startswith(twitch_prefix):
+        print("\033[1;32m twitch_prefix \033[0m")
         send_to_dabi = message.get("formatted_msg", "")[len(twitch_prefix):]
         response = await dabi.send_msg(send_to_dabi)
-    if message.get("formatted_msg", "").startswith(game_prefix):
+    elif message.get("formatted_msg", "").startswith(game_prefix):
+        print("\033[1;32m game_prefix \033[0m")
         send_to_dabi = message.get("formatted_msg", "")[len(game_prefix):]
         response = await dabi.send_msg(send_to_dabi)
-    if message.get("formatted_msg", "").startswith(website_prefix):
+    elif message.get("formatted_msg", "").startswith(website_prefix):
+        print("\033[1;32m website_prefix \033[0m")
         send_to_dabi = message.get("formatted_msg", "")[len(website_prefix):]
         response = await dabi.send_msg(send_to_dabi)
-    if message.get("formatted_msg", "").startswith(discord_prefix):
+    elif message.get("formatted_msg", "").startswith(discord_prefix):
+        print("\033[1;32m discord_prefix \033[0m")
         send_to_dabi = message.get("formatted_msg", "")[len(discord_prefix):]
         response = await dabi.send_msg(send_to_dabi)
-    if message.get("formatted_msg", "").startswith(action_prefix):
+    elif message.get("formatted_msg", "").startswith(action_prefix):
+        print("\033[1;32m action_prefix \033[0m")
         send_to_dabi = await choose_action(message.get("formatted_msg", "")[len(action_prefix):], dabi)
         response = await dabi.send_msg(send_to_dabi)
-    if message.get("formatted_msg", "").startswith(message_prefix) and read_chat_flag:
+    elif message.get("formatted_msg", "").startswith(message_prefix) and read_chat_flag:
+        print("\033[1;32m message_prefix \033[0m")
         send_to_dabi = message.get("formatted_msg", "")[len(message_prefix):]
         response = await dabi.send_msg(send_to_dabi)
-    if message.get("formatted_msg", "").startswith(react_prefix):
+    elif message.get("formatted_msg", "").startswith(react_prefix):
         send_to_dabi_img = message["file_name"]
         send_to_dabi_msg = message.get("formatted_msg", "")[len(react_prefix):]
         response = await dabi.send_img(send_to_dabi_img, send_to_dabi_msg)
@@ -158,7 +174,6 @@ async def speak_message(message, dabi):
     return to_send, voice_path, voice_duration
 
 async def send_msg(queue, dabi, speaking_queue, event):
-    """Process one event and speak it."""
     to_send = None
 
     message = event.get("data", {})
@@ -176,14 +191,16 @@ async def send_msg(queue, dabi, speaking_queue, event):
     # message = check_for_command(message, dabi)
     to_send, voice_path, voice_duration = await speak_message(message, dabi)
     
-    # dabi.read_message_choose_device_mp3(voice_path, CABLE_A_OUTPUT)
-    speaking_queue.put(voice_path)
+    key = "discord.path"
+    await publish_event(key, voice_path)
+    # speaking_queue.put(voice_path)
     await asyncio.sleep(voice_duration + TIME_BETWEEN_SPEAKS)
 
 async def main(input_msg_queue, game_queue, speaking_queue, dabi):
+    global bus
     print(f"{dabi.bot_name=}")
     bus = await ensure_broker()
-    q = await bus.bind_queue(queue_name="app", pattern="#") # Will do ALL redeems
+    q = await bus.bind_queue(queue_name="app", pattern="twitch.#") # Will do ALL redeems of twitch.<below>
     print(f"Connected")
 
     try:
