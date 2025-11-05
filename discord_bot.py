@@ -412,7 +412,7 @@ if __name__ == "__main__":
     # quick local test run
     import multiprocessing
     from bot_openai import OpenAI_Bot, load_personality
-    dabi_name, dabi_voice, dabi_system = load_personality("mythicalmentor")
+    dabi_name, dabi_voice, dabi_system = load_personality()
     discord_dabi = OpenAI_Bot(bot_name=dabi_name, system_message=dabi_system, voice=dabi_voice)
     input_msg_queue = multiprocessing.Queue()
     speaking_queue = multiprocessing.Queue()
