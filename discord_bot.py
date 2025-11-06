@@ -1,6 +1,7 @@
 import os
 import asyncio
 import threading
+import signal
 from io import BytesIO
 import anyio
 import tempfile
@@ -43,6 +44,33 @@ bot = discord.Bot(intents=intents)
 
 # Helpers -------------------------------------------------
 
+async def hard_reset_voice_state(guild: discord.Guild):
+    try:
+        # Explicitly tell Discord "I am in NO voice channel"
+        await guild.change_voice_state(channel=None, self_mute=False, self_deaf=False)
+    except Exception as e:
+        print(f"[VOICE] hard_reset_voice_state warn: {e}")
+    await asyncio.sleep(0.6)  # give the edge time to propagate
+
+async def ensure_voice(ctx):
+    if not ctx.author.voice:
+        await ctx.respond("You aren't in a voice channel!", ephemeral=True)
+        return None
+    try:
+        vc = ctx.guild.voice_client
+        if not vc or not vc.is_connected():
+            # new: pre-null any stale state
+            await hard_reset_voice_state(ctx.guild)
+
+            # connect with no resume and a longer settle
+            vc = await ctx.author.voice.channel.connect(reconnect=False, timeout=30.0)
+            await asyncio.sleep(1.0)  # longer than 0.3s, Sydney can be grumpy
+        return vc
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        await ctx.respond(f"Voice connect failed: `{e}`", ephemeral=True)
+        return None
+
 def _get_model():
     global _MODEL
     if _MODEL is None:
@@ -65,6 +93,12 @@ async def transcribe_async(path: Path, timeout: int = 120) -> str:
         loop.run_in_executor(None, _transcribe_sync, path),
         timeout=timeout
     )
+
+def handle_sigterm(*_):
+    print("\n[SIGNAL] SIGTERM received, shutting down Dabi cleanly...")
+    raise KeyboardInterrupt  # triggers the same finally block
+
+signal.signal(signal.SIGTERM, handle_sigterm)
 
 async def do_transcribe(ctx: discord.ApplicationContext,
                         seconds: int):
@@ -194,12 +228,6 @@ async def on_message(message: discord.message):
         else:
             await message.channel.send("Someone tell George Dabi Bork")
 
-# @tasks.loop(seconds=60)
-# async def voice_keepalive():
-#     for vc in bot.voice_clients:
-#         if vc.is_connected():
-#             vc.send_audio_packet(b'\xF8\xFF\xFE', encode=False)
-
 @bot.slash_command(name="hello", description="Say hello to the bot!")
 @commands.has_any_role(*PRIVILEGED_ROLES)
 async def hello(ctx: discord.ApplicationContext):
@@ -297,6 +325,18 @@ async def test_listening(ctx: discord.ApplicationContext):
     global listening_flag
     await ctx.respond(f"listening_flag is {listening_flag}")
 
+@bot.slash_command(name="fix_voice", description="Force clear Dabi's voice state, then try to join")
+async def fix_voice(ctx: discord.ApplicationContext):
+    await ctx.respond("Resetting voice state…")
+    await hard_reset_voice_state(ctx.guild)
+    await asyncio.sleep(0.5)
+    if ctx.author.voice:
+        vc = await ensure_voice(ctx)
+        if vc:
+            await ctx.followup.send("Connected after reset ✅")
+        else:
+            await ctx.followup.send("Still failing after reset ❌")
+
 def start_receiving(
         *,
         host: str = "0.0.0.0",
@@ -393,8 +433,6 @@ def build_app() -> FastAPI:
     # All new posts need to be before this
     return app
 
-
-
 def start_receiving_in_thread():
     t = threading.Thread(target=lambda: uvicorn.run(build_app(), host="127.0.0.1", port=8002, log_level="info"), daemon=True)
     t.start()
@@ -406,7 +444,27 @@ def start_bot(input_msg_queue, speaking_queue, dabi):
     global_input_msg_queue = input_msg_queue
     global_speaking_queue = speaking_queue
     start_receiving_in_thread()
-    bot.run(DISCORD_TOKEN)
+    try:
+        # Run the bot until interrupted
+        bot.run(DISCORD_TOKEN)
+    except KeyboardInterrupt:
+        # Handle Ctrl+C gracefully
+        print("\n[EXIT] KeyboardInterrupt received, shutting down Dabi cleanly...")
+    except Exception as e:
+        print(f"[EXIT] Exception during bot.run(): {e}")
+    finally:
+        # Always try to close Discord cleanly
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                coro = bot.close()
+                future = asyncio.run_coroutine_threadsafe(coro, loop)
+                future.result(timeout=10)
+            else:
+                asyncio.run(bot.close())
+        except Exception as e:
+            print(f"[EXIT] Exception during bot.close(): {e}")
+        print("[EXIT] Dabi has logged out and cleaned up successfully.")
 
 if __name__ == "__main__":
     # quick local test run
